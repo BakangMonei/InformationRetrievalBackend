@@ -52,7 +52,9 @@ public class IndexServiceImpl implements IndexService {
         String content = new String(Files.readAllBytes(path));
 
         // CISI format pattern (simplified): .I [id] .T [title] .A [author] .W [content]
-        Pattern docPattern = Pattern.compile("\\.I (\\d+)\\s+\\.T\\s+(.*?)(?=\\.A)\\s+\\.A\\s+(.*?)(?=\\.W)\\s+\\.W\\s+(.*?)(?=\\.I|$)", Pattern.DOTALL);
+        Pattern docPattern = Pattern.compile(
+                "\\.I (\\d+)\\s+\\.T\\s+(.*?)(?=\\.A)\\s+\\.A\\s+(.*?)(?=\\.W)\\s+\\.W\\s+(.*?)(?=\\.I|$)",
+                Pattern.DOTALL);
         Matcher matcher = docPattern.matcher(content);
 
         while (matcher.find()) {
@@ -169,10 +171,12 @@ public class IndexServiceImpl implements IndexService {
 
     @Override
     public Map<String, Object> getPerformanceMetrics(String queryId, String relevanceFilePath) throws IOException {
-        // This would typically call the trec_eval tool or implement the precision-recall calculations
+        // This would typically call the trec_eval tool or implement the
+        // precision-recall calculations
         Map<String, Object> metrics = new HashMap<>();
 
-        // Sample implementation - in production, would need to run trec_eval or calculate metrics
+        // Sample implementation - in production, would need to run trec_eval or
+        // calculate metrics
         metrics.put("precision@5", 0.8);
         metrics.put("precision@10", 0.7);
         metrics.put("recall@10", 0.35);

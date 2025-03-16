@@ -5,7 +5,6 @@ package com.moneibakang.informationretrievalbackend.dto;
  * @Time: 07:21 hours
  */
 
-
 import com.moneibakang.informationretrievalbackend.model.Document;
 
 public class DocumentDTO {

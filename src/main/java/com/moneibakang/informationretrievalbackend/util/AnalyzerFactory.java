@@ -22,7 +22,7 @@ public class AnalyzerFactory {
      * Get the appropriate Analyzer based on the tokenizer type and stemming setting
      *
      * @param tokenizerType The type of tokenizer to use
-     * @param useStemming Whether to use stemming
+     * @param useStemming   Whether to use stemming
      * @return The configured Analyzer
      */
     public Analyzer getAnalyzer(String tokenizerType, boolean useStemming) {

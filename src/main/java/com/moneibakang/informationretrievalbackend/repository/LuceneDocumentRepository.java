@@ -140,8 +140,7 @@ public class LuceneDocumentRepository implements DocumentRepository {
             // Create query parser with appropriate analyzer
             Analyzer queryAnalyzer = analyzerFactory.getAnalyzer(
                     searchRequest.getTokenizerType(),
-                    searchRequest.isUseStemming()
-            );
+                    searchRequest.isUseStemming());
 
             QueryParser parser = new QueryParser("content", queryAnalyzer);
             Query query;
@@ -234,7 +233,8 @@ public class LuceneDocumentRepository implements DocumentRepository {
                 Terms terms = leafReader.terms("content");
                 if (terms != null) {
                     termCounts.put("uniqueTerms", termCounts.getOrDefault("uniqueTerms", 0L) + terms.size());
-                    termCounts.put("totalTerms", termCounts.getOrDefault("totalTerms", 0L) + terms.getSumTotalTermFreq());
+                    termCounts.put("totalTerms",
+                            termCounts.getOrDefault("totalTerms", 0L) + terms.getSumTotalTermFreq());
                 }
             }
             stats.putAll(termCounts);
@@ -255,8 +255,7 @@ public class LuceneDocumentRepository implements DocumentRepository {
         this.useStemming = enabled;
         this.currentAnalyzer = analyzerFactory.getAnalyzer(
                 analyzerFactory.getCurrentTokenizerType(),
-                enabled
-        );
+                enabled);
     }
 
     @Override
@@ -302,7 +301,8 @@ public class LuceneDocumentRepository implements DocumentRepository {
         luceneDoc.add(new TextField("title", document.getTitle(), Field.Store.YES));
         luceneDoc.add(new TextField("content", document.getContent(), Field.Store.YES));
         luceneDoc.add(new StringField("collection", document.getCollection(), Field.Store.YES));
-        luceneDoc.add(new StringField("author", document.getAuthor() != null ? document.getAuthor() : "", Field.Store.YES));
+        luceneDoc.add(
+                new StringField("author", document.getAuthor() != null ? document.getAuthor() : "", Field.Store.YES));
         luceneDoc.add(new StringField("timestamp", String.valueOf(document.getTimestamp()), Field.Store.YES));
 
         return luceneDoc;
