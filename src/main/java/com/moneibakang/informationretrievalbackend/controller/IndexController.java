@@ -19,7 +19,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/index")
-@CrossOrigin(origins = "*") // Allow requests from React frontend
+@CrossOrigin(origins = "http://localhost:3000")// Allow requests from React frontend
 public class IndexController {
     private static final Logger logger = LoggerFactory.getLogger(IndexController.class);
 
@@ -88,10 +88,12 @@ public class IndexController {
     }
 
     // Configure tokenizer
-    @PutMapping("/config/tokenizer")
-    public ResponseEntity<Void> configureTokenizer(@RequestParam("type") String tokenizerType) {
+    @RequestMapping(value = "/config/tokenizer", method = {RequestMethod.GET, RequestMethod.PUT})
+    public ResponseEntity<Void> configureTokenizer(@RequestParam(value = "type", required = false) String tokenizerType) {
         try {
-            documentService.configureTokenizer(tokenizerType);
+            if (tokenizerType != null) {
+                documentService.configureTokenizer(tokenizerType);
+            }
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (IOException e) {
             logger.error("Error configuring tokenizer", e);
@@ -100,10 +102,12 @@ public class IndexController {
     }
 
     // Configure stemming
-    @PutMapping("/config/stemming")
-    public ResponseEntity<Void> configureStemming(@RequestParam("enabled") boolean stemming) {
+    @RequestMapping(value = "/config/stemming", method = {RequestMethod.GET, RequestMethod.PUT})
+    public ResponseEntity<Void> configureStemming(@RequestParam(value = "enabled", required = false) Boolean stemming) {
         try {
-            documentService.configureStemming(stemming);
+            if (stemming != null) {
+                documentService.configureStemming(stemming);
+            }
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (IOException e) {
             logger.error("Error configuring stemming", e);
@@ -112,10 +116,12 @@ public class IndexController {
     }
 
     // Configure ranking algorithm
-    @PutMapping("/config/ranking")
-    public ResponseEntity<Void> configureRanking(@RequestParam("algorithm") String algorithm) {
+    @RequestMapping(value = "/config/ranking", method = {RequestMethod.GET, RequestMethod.PUT})
+    public ResponseEntity<Void> configureRanking(@RequestParam(value = "algorithm", required = false) String algorithm) {
         try {
-            documentService.configureRankingAlgorithm(algorithm);
+            if (algorithm != null) {
+                documentService.configureRankingAlgorithm(algorithm);
+            }
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (IOException e) {
             logger.error("Error configuring ranking algorithm", e);
@@ -124,10 +130,12 @@ public class IndexController {
     }
 
     // Configure length normalization
-    @PutMapping("/config/normalization")
-    public ResponseEntity<Void> configureLengthNormalization(@RequestParam("enabled") boolean normalization) {
+    @RequestMapping(value = "/config/normalization", method = {RequestMethod.GET, RequestMethod.PUT})
+    public ResponseEntity<Void> configureLengthNormalization(@RequestParam(value = "enabled", required = false) Boolean normalization) {
         try {
-            documentService.configureLengthNormalization(normalization);
+            if (normalization != null) {
+                documentService.configureLengthNormalization(normalization);
+            }
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (IOException e) {
             logger.error("Error configuring length normalization", e);

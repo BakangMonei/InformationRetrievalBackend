@@ -19,7 +19,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/documents")
-@CrossOrigin(origins = "*") // Allow requests from React frontend
+@CrossOrigin(origins = "http://localhost:3000")// Allow requests from React frontend
 public class DocumentController {
     private static final Logger logger = LoggerFactory.getLogger(DocumentController.class);
 
