@@ -5,5 +5,12 @@ package com.moneibakang.informationretrievalbackend.exception;
  * @Time: 07:21 hours
  */
 
-public class DocumentNotFoundException {
+public class DocumentNotFoundException extends RuntimeException {
+    public DocumentNotFoundException(String message) {
+        super(message);
+    }
+
+    public DocumentNotFoundException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }
