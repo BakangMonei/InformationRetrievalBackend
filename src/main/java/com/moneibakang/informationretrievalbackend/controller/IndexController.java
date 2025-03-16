@@ -58,13 +58,20 @@ public class IndexController {
 
     // Import CISI collection
     @PostMapping("/import/cisi")
-    public ResponseEntity<Void> importCISICollection(@RequestParam("filePath") String filePath) {
+    public ResponseEntity<String> importCISICollection(
+            @RequestParam(required = false) String filePath) {
         try {
-            indexService.importCISICollection(filePath);
-            return new ResponseEntity<>(HttpStatus.OK);
+            // Use the provided filePath or fall back to the default one from properties
+            String path = (filePath != null && !filePath.isEmpty())
+                    ? filePath
+                    : "src/main/resources/CISI.ALL";
+
+            indexService.importCISICollection(path);
+            return new ResponseEntity<>("CISI collection imported successfully", HttpStatus.OK);
         } catch (IOException e) {
             logger.error("Error importing CISI collection", e);
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>("Error importing CISI collection: " + e.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

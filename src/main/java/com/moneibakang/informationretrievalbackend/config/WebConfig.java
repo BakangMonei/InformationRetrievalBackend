@@ -5,7 +5,6 @@ package com.moneibakang.informationretrievalbackend.config;
  * @Time: 07:21 hours
  */
 
-
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.*;
 

@@ -6,7 +6,6 @@ package com.moneibakang.informationretrievalbackend.config;
  * @Time: 07:21 hours
  */
 
-
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.springframework.context.annotation.Bean;
