@@ -100,10 +100,21 @@ public class DocumentController {
     }
 
     // SEARCH - Search documents
-    @PostMapping("/search")
-    public ResponseEntity<SearchResponseDTO> searchDocuments(@RequestBody SearchRequestDTO searchRequest) {
+    @RequestMapping(value = "/search", method = {RequestMethod.GET, RequestMethod.POST})
+    public ResponseEntity<SearchResponseDTO> searchDocuments(
+            @RequestParam(value = "q", required = false) String query,
+            @RequestBody(required = false) SearchRequestDTO searchRequest) {
         try {
-            SearchResponseDTO searchResponse = documentService.searchDocuments(searchRequest);
+            // Handle both GET and POST requests
+            SearchRequestDTO finalRequest;
+            if (searchRequest == null) {
+                finalRequest = new SearchRequestDTO();
+                finalRequest.setQuery(query);
+            } else {
+                finalRequest = searchRequest;
+            }
+            
+            SearchResponseDTO searchResponse = documentService.searchDocuments(finalRequest);
             return new ResponseEntity<>(searchResponse, HttpStatus.OK);
         } catch (IOException e) {
             logger.error("Error searching documents", e);
@@ -113,13 +124,17 @@ public class DocumentController {
 
     // BULK IMPORT - Import multiple documents
     @PostMapping("/bulk")
-    public ResponseEntity<List<String>> bulkImportDocuments(@RequestBody List<DocumentDTO> documents) {
+    public ResponseEntity<?> bulkImportDocuments(@RequestBody List<DocumentDTO> documents) {
         try {
+            if (documents == null || documents.isEmpty()) {
+                return new ResponseEntity<>("No documents provided", HttpStatus.BAD_REQUEST);
+            }
             List<String> ids = documentService.bulkImportDocuments(documents);
             return new ResponseEntity<>(ids, HttpStatus.CREATED);
         } catch (IOException e) {
             logger.error("Error bulk importing documents", e);
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>("Error processing documents: " + e.getMessage(), 
+                                      HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }

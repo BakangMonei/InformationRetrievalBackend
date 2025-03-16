@@ -14,7 +14,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -77,13 +79,24 @@ public class IndexController {
 
     // Import PubMed collection
     @PostMapping("/import/pubmed")
-    public ResponseEntity<Void> importPubMedCollection(@RequestParam("filePath") String filePath) {
+    public ResponseEntity<String> importPubMedCollection(
+            @RequestParam(value = "filePath", required = false) String filePath) {
         try {
+            if (filePath == null || filePath.isEmpty()) {
+                return new ResponseEntity<>("File path is required", HttpStatus.BAD_REQUEST);
+            }
+            
+            File file = new File(filePath);
+            if (!file.exists()) {
+                return new ResponseEntity<>("File not found: " + filePath, HttpStatus.NOT_FOUND);
+            }
+            
             indexService.importPubMedCollection(filePath);
-            return new ResponseEntity<>(HttpStatus.OK);
+            return new ResponseEntity<>("PubMed collection imported successfully", HttpStatus.OK);
         } catch (IOException e) {
             logger.error("Error importing PubMed collection", e);
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>("Error importing PubMed collection: " + e.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -146,9 +159,13 @@ public class IndexController {
     // Get performance metrics
     @GetMapping("/metrics")
     public ResponseEntity<Map<String, Object>> getPerformanceMetrics(
-            @RequestParam("queryId") String queryId,
-            @RequestParam("relevanceFile") String relevanceFilePath) {
+            @RequestParam(value = "queryId", required = false) String queryId,
+            @RequestParam(value = "relevanceFile", required = false) String relevanceFilePath) {
         try {
+            // Return empty metrics if parameters are not provided
+            if (queryId == null || relevanceFilePath == null) {
+                return new ResponseEntity<>(new HashMap<>(), HttpStatus.OK);
+            }
             Map<String, Object> metrics = indexService.getPerformanceMetrics(queryId, relevanceFilePath);
             return new ResponseEntity<>(metrics, HttpStatus.OK);
         } catch (IOException e) {

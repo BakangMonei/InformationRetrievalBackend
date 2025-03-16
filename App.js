@@ -36,6 +36,22 @@ axios.interceptors.response.use(
           <p className="text-sm">Make sure the Spring backend is running on port 8080</p>
         </div>
       );
+    } else if (error.response?.status === 500) {
+      const errorMessage = error.response?.data?.message || 'An internal server error occurred';
+      console.error('Server Error:', error.response?.data);
+      toast.error(
+        <div>
+          <strong>Server Error</strong>
+          <p className="text-sm">{errorMessage}</p>
+        </div>
+      );
+    } else if (error.response?.status === 404) {
+      toast.error(
+        <div>
+          <strong>Not Found</strong>
+          <p className="text-sm">The requested resource was not found</p>
+        </div>
+      );
     }
     return Promise.reject(error);
   }
@@ -61,6 +77,14 @@ function App() {
     ranking: {},
     stemming: {},
     tokenizer: {}
+  });
+
+  // Add these state variables after the existing useState declarations
+  const [searchConfig, setSearchConfig] = useState({
+    tokenizerType: 'standard', // or 'custom'
+    useStemming: false,
+    rankingAlgorithm: 'tf-idf', // or 'tf'
+    lengthNormalization: true
   });
 
   const sliderSettings = {
@@ -133,10 +157,21 @@ function App() {
         'tokenizer'
       ];
 
+      // Add retry logic
+      const fetchWithRetry = async (endpoint, retries = 3) => {
+        for (let i = 0; i < retries; i++) {
+          try {
+            const response = await axios.get(`/index/config/${endpoint}`);
+            return response;
+          } catch (error) {
+            if (i === retries - 1) throw error;
+            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+          }
+        }
+      };
+
       const results = await Promise.allSettled(
-        endpoints.map(endpoint =>
-          axios.get(`/index/config/${endpoint}`)
-        )
+        endpoints.map(endpoint => fetchWithRetry(endpoint))
       );
 
       const newConfig = {};
@@ -145,14 +180,13 @@ function App() {
           newConfig[endpoints[index]] = result.value.data;
         } else {
           newConfig[endpoints[index]] = null;
-          console.warn(`Failed to load ${endpoints[index]} config`);
+          console.warn(`Failed to load ${endpoints[index]} config after retries`);
         }
       });
 
       setConfig(newConfig);
     } catch (error) {
       console.warn('Error fetching configurations:', error);
-      // Don't show error toast as this is handled by the parent promise
     }
   };
 
@@ -180,15 +214,28 @@ function App() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
+    if (!searchQuery.trim()) {
+      toast.error('Please enter a search query');
+      return;
+    }
+
     setLoading(prev => ({ ...prev, search: true }));
     try {
       const response = await axios.get('/documents/search', {
-        params: { q: searchQuery }
+        params: { q: searchQuery.trim() }
       });
-      setDocuments(response.data);
-      toast.success(`Found ${response.data.length} results`);
+      
+      if (response.data && Array.isArray(response.data)) {
+        setDocuments(response.data);
+        toast.success(`Found ${response.data.length} results`);
+      } else {
+        setDocuments([]);
+        toast.info('No results found');
+      }
     } catch (error) {
-      toast.error('Error searching documents');
+      console.error('Search error:', error);
+      setDocuments([]);
+      toast.error('Error performing search');
     } finally {
       setLoading(prev => ({ ...prev, search: false }));
     }
@@ -205,11 +252,11 @@ function App() {
       toast.error('Please select a file first');
       return;
     }
-    
+
     setLoading(prev => ({ ...prev, upload: true }));
     const formData = new FormData();
     formData.append('file', selectedFile);
-    
+
     try {
       const response = await axios.post('/documents/bulk', formData, {
         headers: {
@@ -221,18 +268,20 @@ function App() {
             id: 'uploadProgress',
           });
         },
+        timeout: 30000 // 30 seconds
       });
-      
+
       toast.success('Documents uploaded successfully');
       await fetchIndexStats();
       setSelectedFile(null);
-      
-      // Clear the file input
+
       const fileInput = document.querySelector('input[type="file"]');
       if (fileInput) fileInput.value = '';
-      
+
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Error uploading documents');
+      const errorMessage = error.response?.data?.message || 'Error uploading documents';
+      console.error('Upload Error:', error.response?.data);
+      toast.error(errorMessage);
     } finally {
       setLoading(prev => ({ ...prev, upload: false }));
       toast.dismiss('uploadProgress');
@@ -242,11 +291,15 @@ function App() {
   const handleImport = async (type) => {
     setLoading(prev => ({ ...prev, import: true }));
     try {
-      await axios.post(`/index/import/${type}`);
+      const response = await axios.post(`/index/import/${type}`, null, {
+        timeout: 60000 // 60 seconds timeout for potentially long import
+      });
       toast.success(`${type.toUpperCase()} dataset imported successfully`);
       await fetchInitialData();
     } catch (error) {
-      toast.error(`Error importing ${type} dataset`);
+      const errorMessage = error.response?.data?.message || `Error importing ${type} dataset`;
+      console.error('Import Error:', error.response?.data);
+      toast.error(errorMessage);
     } finally {
       setLoading(prev => ({ ...prev, import: false }));
     }
@@ -272,25 +325,153 @@ function App() {
   // Add this component for server status
   const ServerStatus = () => (
     <div className={`fixed bottom-4 right-4 p-3 rounded-lg shadow-lg 
-      ${serverStatus === 'connected' ? 'bg-green-100' : 
+      ${serverStatus === 'connected' ? 'bg-green-100' :
         serverStatus === 'checking' ? 'bg-yellow-100' : 'bg-red-100'}`}>
       <div className="flex items-center gap-2">
         <div className={`w-3 h-3 rounded-full 
-          ${serverStatus === 'connected' ? 'bg-green-500' : 
+          ${serverStatus === 'connected' ? 'bg-green-500' :
             serverStatus === 'checking' ? 'bg-yellow-500' : 'bg-red-500'}`} />
         <span className="text-sm font-medium">
-          {serverStatus === 'connected' ? 'Server Connected' : 
-           serverStatus === 'checking' ? 'Checking Connection' : 'Server Disconnected'}
+          {serverStatus === 'connected' ? 'Server Connected' :
+            serverStatus === 'checking' ? 'Checking Connection' : 'Server Disconnected'}
         </span>
       </div>
     </div>
   );
 
+  // Add this component before the return statement
+  const ConfigurationPanel = () => (
+    <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+      <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+        <Settings className="h-5 w-5 text-indigo-600" />
+        Search Configuration
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Tokenizer Selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Tokenizer Type
+          </label>
+          <select
+            value={searchConfig.tokenizerType}
+            onChange={(e) => setSearchConfig(prev => ({
+              ...prev,
+              tokenizerType: e.target.value
+            }))}
+            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+          >
+            <option value="standard">Standard Tokenizer</option>
+            <option value="custom">Custom Tokenizer</option>
+          </select>
+        </div>
+
+        {/* Stemming Toggle */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Stemming
+          </label>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              checked={searchConfig.useStemming}
+              onChange={(e) => setSearchConfig(prev => ({
+                ...prev,
+                useStemming: e.target.checked
+              }))}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <span className="ml-2 text-sm text-gray-600">Enable Stemming</span>
+          </div>
+        </div>
+
+        {/* Ranking Algorithm */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Ranking Algorithm
+          </label>
+          <select
+            value={searchConfig.rankingAlgorithm}
+            onChange={(e) => setSearchConfig(prev => ({
+              ...prev,
+              rankingAlgorithm: e.target.value
+            }))}
+            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+          >
+            <option value="tf-idf">TF-IDF</option>
+            <option value="tf">Term Frequency</option>
+          </select>
+        </div>
+
+        {/* Length Normalization */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Length Normalization
+          </label>
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              checked={searchConfig.lengthNormalization}
+              onChange={(e) => setSearchConfig(prev => ({
+                ...prev,
+                lengthNormalization: e.target.checked
+              }))}
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            />
+            <span className="ml-2 text-sm text-gray-600">Enable Length Normalization</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Add this new component for displaying search results
+  const SearchResults = ({ documents }) => {
+    if (!documents.length) {
+      return null;
+    }
+
+    return (
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Search className="h-5 w-5 text-indigo-600" />
+          Search Results ({documents.length})
+        </h2>
+        <div className="space-y-6">
+          {documents.map((doc, index) => (
+            <div 
+              key={index} 
+              className="border-b border-gray-200 pb-4 last:border-0 last:pb-0"
+            >
+              <h3 className="font-medium text-lg text-gray-900 mb-2">
+                {doc.title || 'Untitled Document'}
+              </h3>
+              {doc.author && (
+                <p className="text-sm text-gray-600 mb-2">
+                  Author: {doc.author}
+                </p>
+              )}
+              {doc.content && (
+                <p className="text-gray-700 line-clamp-3">
+                  {doc.content}
+                </p>
+              )}
+              {doc.score && (
+                <p className="text-sm text-gray-500 mt-2">
+                  Relevance Score: {doc.score.toFixed(4)}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Toaster position="top-right" />
       <ServerStatus />
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="text-center mb-12">
@@ -310,17 +491,27 @@ function App() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                placeholder="Search documents..."
+                className="w-full pl-10 pr-4 py-2 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                placeholder="Enter your search query..."
+                disabled={loading.search}
               />
             </div>
             <button
               type="submit"
-              disabled={loading.search}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex items-center gap-2 disabled:opacity-50"
+              disabled={loading.search || !searchQuery.trim()}
+              className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loading.search ? <Loader className="animate-spin" /> : <Search />}
-              Search
+              {loading.search ? (
+                <>
+                  <Loader className="animate-spin h-4 w-4" />
+                  Searching...
+                </>
+              ) : (
+                <>
+                  <Search className="h-4 w-4" />
+                  Search
+                </>
+              )}
             </button>
           </form>
         </div>
@@ -431,26 +622,14 @@ function App() {
           </Slider>
         </div>
 
+        {/* Configuration Panel */}
+        <ConfigurationPanel />
+
         {/* Search Results */}
-        {documents.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <Search className="h-5 w-5 text-indigo-600" />
-              Search Results
-            </h2>
-            <div className="space-y-4">
-              {documents.map((doc, index) => (
-                <div key={index} className="border-b pb-4">
-                  <h3 className="font-medium">{doc.title}</h3>
-                  <p className="text-gray-600">{doc.content}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <SearchResults documents={documents} />
       </div>
     </div>
   );
 }
 
-export default App; 
+export default App;
