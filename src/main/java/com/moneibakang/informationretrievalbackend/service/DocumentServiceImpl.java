@@ -24,6 +24,12 @@ public class DocumentServiceImpl implements DocumentService {
 
     private final DocumentRepository documentRepository;
 
+    // Add these fields to track current configuration
+    private String currentTokenizerType = "standard";
+    private boolean stemmingEnabled = false;
+    private String currentRankingAlgorithm = "tf-idf";
+    private boolean lengthNormalizationEnabled = true;
+
     @Autowired
     public DocumentServiceImpl(DocumentRepository documentRepository) {
         this.documentRepository = documentRepository;
@@ -98,26 +104,50 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
+    public String getCurrentTokenizerType() {
+        return currentTokenizerType;
+    }
+
+    @Override
+    public boolean isStemmingEnabled() {
+        return stemmingEnabled;
+    }
+
+    @Override
+    public String getCurrentRankingAlgorithm() {
+        return currentRankingAlgorithm;
+    }
+
+    @Override
+    public boolean isLengthNormalizationEnabled() {
+        return lengthNormalizationEnabled;
+    }
+
+    @Override
     public void configureTokenizer(String type) throws IOException {
         logger.info("Configuring tokenizer: {}", type);
+        this.currentTokenizerType = type;
         documentRepository.setTokenizer(type);
     }
 
     @Override
     public void configureStemming(boolean enabled) throws IOException {
         logger.info("Configuring stemming: {}", enabled);
+        this.stemmingEnabled = enabled;
         documentRepository.setStemming(enabled);
     }
 
     @Override
     public void configureRankingAlgorithm(String algorithm) throws IOException {
         logger.info("Configuring ranking algorithm: {}", algorithm);
+        this.currentRankingAlgorithm = algorithm;
         documentRepository.setRankingAlgorithm(algorithm);
     }
 
     @Override
     public void configureLengthNormalization(boolean enabled) throws IOException {
         logger.info("Configuring length normalization: {}", enabled);
+        this.lengthNormalizationEnabled = enabled;
         documentRepository.setLengthNormalization(enabled);
     }
 

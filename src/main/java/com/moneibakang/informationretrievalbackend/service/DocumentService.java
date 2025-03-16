@@ -40,4 +40,10 @@ public interface DocumentService {
 
     // Stats operations
     Map<String, Object> getIndexStatistics() throws IOException;
+
+    // Configuration getters
+    String getCurrentTokenizerType();
+    boolean isStemmingEnabled();
+    String getCurrentRankingAlgorithm();
+    boolean isLengthNormalizationEnabled();
 }

@@ -101,11 +101,12 @@ public class IndexController {
     }
 
     // Configure tokenizer
-    @RequestMapping(value = "/config/tokenizer", method = {RequestMethod.GET, RequestMethod.PUT})
-    public ResponseEntity<Void> configureTokenizer(@RequestParam(value = "type", required = false) String tokenizerType) {
+    @PutMapping("/config/tokenizer")
+    public ResponseEntity<Void> configureTokenizer(@RequestBody Map<String, String> config) {
         try {
-            if (tokenizerType != null) {
-                documentService.configureTokenizer(tokenizerType);
+            String type = config.get("type");
+            if (type != null) {
+                documentService.configureTokenizer(type);
             }
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (IOException e) {
@@ -115,11 +116,12 @@ public class IndexController {
     }
 
     // Configure stemming
-    @RequestMapping(value = "/config/stemming", method = {RequestMethod.GET, RequestMethod.PUT})
-    public ResponseEntity<Void> configureStemming(@RequestParam(value = "enabled", required = false) Boolean stemming) {
+    @PutMapping("/config/stemming")
+    public ResponseEntity<Void> configureStemming(@RequestBody Map<String, Boolean> config) {
         try {
-            if (stemming != null) {
-                documentService.configureStemming(stemming);
+            Boolean enabled = config.get("enabled");
+            if (enabled != null) {
+                documentService.configureStemming(enabled);
             }
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (IOException e) {
@@ -129,9 +131,10 @@ public class IndexController {
     }
 
     // Configure ranking algorithm
-    @RequestMapping(value = "/config/ranking", method = {RequestMethod.GET, RequestMethod.PUT})
-    public ResponseEntity<Void> configureRanking(@RequestParam(value = "algorithm", required = false) String algorithm) {
+    @PutMapping("/config/ranking")
+    public ResponseEntity<Void> configureRanking(@RequestBody Map<String, String> config) {
         try {
+            String algorithm = config.get("algorithm");
             if (algorithm != null) {
                 documentService.configureRankingAlgorithm(algorithm);
             }
@@ -143,11 +146,12 @@ public class IndexController {
     }
 
     // Configure length normalization
-    @RequestMapping(value = "/config/normalization", method = {RequestMethod.GET, RequestMethod.PUT})
-    public ResponseEntity<Void> configureLengthNormalization(@RequestParam(value = "enabled", required = false) Boolean normalization) {
+    @PutMapping("/config/normalization")
+    public ResponseEntity<Void> configureLengthNormalization(@RequestBody Map<String, Boolean> config) {
         try {
-            if (normalization != null) {
-                documentService.configureLengthNormalization(normalization);
+            Boolean enabled = config.get("enabled");
+            if (enabled != null) {
+                documentService.configureLengthNormalization(enabled);
             }
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (IOException e) {
@@ -172,5 +176,44 @@ public class IndexController {
             logger.error("Error getting performance metrics", e);
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    // Get current tokenizer configuration
+    @GetMapping("/config/tokenizer")
+    public ResponseEntity<Map<String, String>> getTokenizerConfig() {
+        Map<String, String> config = new HashMap<>();
+        config.put("type", documentService.getCurrentTokenizerType());
+        return new ResponseEntity<>(config, HttpStatus.OK);
+    }
+
+    // Get current stemming configuration
+    @GetMapping("/config/stemming")
+    public ResponseEntity<Map<String, Boolean>> getStemmingConfig() {
+        Map<String, Boolean> config = new HashMap<>();
+        config.put("enabled", documentService.isStemmingEnabled());
+        return new ResponseEntity<>(config, HttpStatus.OK);
+    }
+
+    // Get current ranking configuration
+    @GetMapping("/config/ranking")
+    public ResponseEntity<Map<String, String>> getRankingConfig() {
+        Map<String, String> config = new HashMap<>();
+        config.put("algorithm", documentService.getCurrentRankingAlgorithm());
+        return new ResponseEntity<>(config, HttpStatus.OK);
+    }
+
+    // Get current normalization configuration
+    @GetMapping("/config/normalization")
+    public ResponseEntity<Map<String, Boolean>> getNormalizationConfig() {
+        Map<String, Boolean> config = new HashMap<>();
+        config.put("enabled", documentService.isLengthNormalizationEnabled());
+        return new ResponseEntity<>(config, HttpStatus.OK);
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, String>> healthCheck() {
+        Map<String, String> response = new HashMap<>();
+        response.put("status", "UP");
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 }
