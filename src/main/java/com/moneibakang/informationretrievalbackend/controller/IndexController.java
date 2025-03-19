@@ -4,14 +4,12 @@ package com.moneibakang.informationretrievalbackend.controller;
  * @Date: 16 March 2025
  * @Time: 07:21 hours
  */
-
 import com.moneibakang.informationretrievalbackend.service.DocumentService;
-import com.moneibakang.informationretrievalbackend.service.IndexService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.moneibakang.informationretrievalbackend.service.*;
+import org.slf4j.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.File;
@@ -63,11 +61,9 @@ public class IndexController {
     public ResponseEntity<String> importCISICollection(
             @RequestParam(required = false) String filePath) {
         try {
-            // Use the provided filePath or fall back to the default one from properties
             String path = (filePath != null && !filePath.isEmpty())
                     ? filePath
                     : "src/main/resources/CISI.ALL";
-
             indexService.importCISICollection(path);
             return new ResponseEntity<>("CISI collection imported successfully", HttpStatus.OK);
         } catch (IOException e) {
@@ -80,22 +76,17 @@ public class IndexController {
     // Import PubMed collection
     @PostMapping("/import/pubmed")
     public ResponseEntity<String> importPubMedCollection(
-            @RequestParam(value = "filePath", required = false) String filePath) {
+            @RequestParam(required = false) String filePath) {
         try {
-            if (filePath == null || filePath.isEmpty()) {
-                return new ResponseEntity<>("File path is required", HttpStatus.BAD_REQUEST);
-            }
-            
-            File file = new File(filePath);
-            if (!file.exists()) {
-                return new ResponseEntity<>("File not found: " + filePath, HttpStatus.NOT_FOUND);
-            }
-            
-            indexService.importPubMedCollection(filePath);
-            return new ResponseEntity<>("PubMed collection imported successfully", HttpStatus.OK);
+            // Use the provided filePath or fall back to the default one from properties
+            String path = (filePath != null && !filePath.isEmpty())
+                    ? filePath
+                    : "src/main/resources/pubmed25n0002.xml";
+            indexService.importPubMedCollection(path);
+            return new ResponseEntity<>("PUBMED collection imported successfully", HttpStatus.OK);
         } catch (IOException e) {
-            logger.error("Error importing PubMed collection", e);
-            return new ResponseEntity<>("Error importing PubMed collection: " + e.getMessage(),
+            logger.error("Error importing PUBMED collection", e);
+            return new ResponseEntity<>("Error importing PUBMED collection: " + e.getMessage(),
                     HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }

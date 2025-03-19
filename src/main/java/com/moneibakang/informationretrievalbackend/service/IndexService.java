@@ -19,4 +19,8 @@ public interface IndexService {
     void importPubMedCollection(String filePath) throws IOException;
 
     Map<String, Object> getPerformanceMetrics(String queryId, String relevanceFilePath) throws IOException;
+
+    List<String> getConsoleLogs(
+            // Path: src/main/java/com/moneibakang/informationretrievalbackend/service/IndexService.java
+    );
 }

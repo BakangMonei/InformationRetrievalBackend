@@ -10,6 +10,7 @@ import com.moneibakang.informationretrievalbackend.dto.*;
 
 import java.io.*;
 import java.util.*;
+import org.springframework.web.multipart.MultipartFile;
 
 public interface DocumentService {
     // CRUD operations
@@ -46,4 +47,7 @@ public interface DocumentService {
     boolean isStemmingEnabled();
     String getCurrentRankingAlgorithm();
     boolean isLengthNormalizationEnabled();
+
+    // Method to process uploaded file
+    void processUploadedFile(MultipartFile file) throws IOException;
 }

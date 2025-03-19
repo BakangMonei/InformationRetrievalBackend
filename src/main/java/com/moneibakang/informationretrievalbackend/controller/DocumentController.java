@@ -10,9 +10,9 @@ import com.moneibakang.informationretrievalbackend.exception.*;
 import com.moneibakang.informationretrievalbackend.service.*;
 import org.slf4j.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
@@ -133,8 +133,23 @@ public class DocumentController {
             return new ResponseEntity<>(ids, HttpStatus.CREATED);
         } catch (IOException e) {
             logger.error("Error bulk importing documents", e);
-            return new ResponseEntity<>("Error processing documents: " + e.getMessage(), 
-                                      HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>("Error processing documents: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // FILE UPLOAD - Upload a file for information retrieval
+    @PostMapping("/upload")
+    public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return new ResponseEntity<>("No file uploaded", HttpStatus.BAD_REQUEST);
+        }
+        try {
+            // Process the file (you will need to implement this logic)
+            documentService.processUploadedFile(file);
+            return new ResponseEntity<>("File uploaded successfully", HttpStatus.OK);
+        } catch (IOException e) {
+            logger.error("Error uploading file", e);
+            return new ResponseEntity<>("Error processing file: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }

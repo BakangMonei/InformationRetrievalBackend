@@ -13,6 +13,7 @@ import com.moneibakang.informationretrievalbackend.repository.*;
 import org.slf4j.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
 import java.util.*;
@@ -121,6 +122,11 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public boolean isLengthNormalizationEnabled() {
         return lengthNormalizationEnabled;
+    }
+
+    @Override
+    public void processUploadedFile(MultipartFile file) throws IOException {
+        logger.info("Uploaded file: {}", file.getOriginalFilename());
     }
 
     @Override
