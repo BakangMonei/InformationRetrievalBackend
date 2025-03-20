@@ -289,3 +289,8 @@ curl http://localhost:8080/api/index/health
 ```
 
 Note: All examples assume the server is running on localhost:8080. Adjust the URL according to your deployment environment.
+
+
+
+
+imageee_for_sos.png

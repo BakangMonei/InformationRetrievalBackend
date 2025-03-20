@@ -65,6 +65,11 @@
             <artifactId>lucene-analyzers-common</artifactId>
             <version>8.10.0</version>
         </dependency>
+        <dependency>
+            <groupId>gov.sandia.foundry</groupId>
+            <artifactId>porter-stemmer</artifactId>
+            <version>1.4</version>
+        </dependency>
     </dependencies>
 
     <build>

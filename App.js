@@ -113,7 +113,11 @@ function App() {
     tokenizerType: 'standard', // or 'custom'
     useStemming: false,
     rankingAlgorithm: 'tf-idf', // or 'tf'
-    lengthNormalization: true
+    lengthNormalization: true,
+    // New evaluation-specific options
+    evaluationMode: false,
+    useRelevanceJudgments: false,
+    relevanceThreshold: 0.5
   });
 
   // Add new state for dialog
@@ -123,6 +127,21 @@ function App() {
     message: '',
     confirmText: '',
     onConfirm: () => { },
+  });
+
+  // Add new state variables for IR evaluation
+  const [evaluationMetrics, setEvaluationMetrics] = useState({
+    precisionRecall: [],
+    indexingStats: {
+      timeToIndex: null,
+      tokenCount: null,
+      uniqueTokenCount: null,
+      indexSize: null
+    },
+    tokenizationComparison: {
+      standard: {},
+      custom: {}
+    }
   });
 
   const sliderSettings = {
@@ -270,7 +289,6 @@ function App() {
 
     setLoading(prev => ({ ...prev, search: true }));
     try {
-      // Send search request with all configuration parameters
       const response = await axios.post('/documents/search', {
         query: searchQuery.trim(),
         tokenizerType: searchConfig.tokenizerType,
@@ -281,26 +299,36 @@ function App() {
         page: 0
       });
 
-      // Handle structured response with results and metrics
       if (response.data) {
-        const { results, totalHits, queryTime, metrics } = response.data;
+        const { 
+          results, 
+          totalHits, 
+          queryTime, 
+          metrics: {
+            precision,
+            recall,
+            f1Score,
+            tokenizationTime,
+            rankingTime,
+            numberOfTokens,
+            averageDocumentLength,
+            vocabularySize
+          }
+        } = response.data;
 
         setDocuments(results || []);
-
-        // Update metrics for visualization
-        if (metrics) {
-          setIndexMetrics({
-            ...metrics,
-            queryTime,
-            totalHits,
-            precision: metrics.precision,
-            recall: metrics.recall,
-            f1Score: metrics.f1Score,
-            tokenizationTime: metrics.tokenizationTime,
-            rankingTime: metrics.rankingTime,
-            numberOfTokens: metrics.numberOfTokens
-          });
-        }
+        setIndexMetrics({
+          precision: precision?.toFixed(3) || 0,
+          recall: recall?.toFixed(3) || 0,
+          f1Score: f1Score?.toFixed(3) || 0,
+          queryTime,
+          totalHits,
+          tokenizationTime,
+          rankingTime,
+          numberOfTokens,
+          averageDocumentLength,
+          vocabularySize
+        });
 
         toast.success(`Found ${totalHits} results in ${queryTime}ms`);
       } else {
@@ -323,8 +351,47 @@ function App() {
    */
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
-    setSelectedFile(file);
-    toast.success(`Selected file: ${file.name}`);
+    
+    // Update allowed types to include XML
+    const allowedTypes = [
+      'text/plain', 
+      'application/json', 
+      'text/csv',
+      'text/xml',
+      'application/xml',
+      '.xml'  // For PubMed XML files
+    ];
+    const maxSize = 1000 * 2048 * 2048; // Increased to 100MB for larger XML files
+
+    if (!file) {
+      toast.error('Please select a file');
+      return;
+    }
+
+    // Check file extension for XML files specifically
+    const fileExtension = file.name.split('.').pop().toLowerCase();
+    const isAllowedType = allowedTypes.includes(file.type) || 
+                         allowedTypes.includes(`.${fileExtension}`);
+
+    if (!isAllowedType) {
+      toast.error('Invalid file type. Please upload a .txt, .json, .csv, or .xml file');
+      return;
+    }
+
+    if (file.size > maxSize) {
+      toast.error('File is too large. Maximum size is 100MB');
+      return;
+    }
+
+    // Add file type detection
+    const fileType = fileExtension === 'xml' ? 'pubmed' : 'standard';
+    
+    setSelectedFile({
+      file,
+      type: fileType
+    });
+    
+    toast.success(`Selected ${fileType.toUpperCase()} file: ${file.name}`);
   };
 
   /**
@@ -340,36 +407,69 @@ function App() {
 
     setLoading(prev => ({ ...prev, upload: true }));
     const formData = new FormData();
-    formData.append('file', selectedFile);
+    formData.append('file', selectedFile.file);
+    
+    // Add configuration parameters
+    formData.append('tokenizerType', searchConfig.tokenizerType);
+    formData.append('useStemming', searchConfig.useStemming);
+    formData.append('rankingAlgorithm', searchConfig.rankingAlgorithm);
+    formData.append('lengthNormalization', searchConfig.lengthNormalization);
 
     try {
-      const response = await axios.post('/documents/bulk', formData, {
+      const uploadResponse = await axios.post('/documents/bulk', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          toast.loading(`Uploading: ${percentCompleted}%`, {
-            id: 'uploadProgress',
-          });
-        },
-        timeout: 30000 // 30 seconds
+        timeout: 300000 // 5 minutes
       });
 
-      toast.success('Documents uploaded successfully');
-      await fetchIndexStats();
-      setSelectedFile(null);
+      if (uploadResponse.data) {
+        const metrics = uploadResponse.data;
+        
+        // Update metrics display
+        setIndexMetrics(prev => ({
+          ...prev,
+          documentCount: metrics.totalDocuments,
+          tokenCount: metrics.totalTokens,
+          uniqueTokenCount: metrics.uniqueTokens,
+          processingTime: metrics.processingTime,
+          averageDocumentLength: metrics.averageDocLength,
+          precision: metrics.precision,
+          recall: metrics.recall,
+          f1Score: metrics.f1Score,
+          datasetType: metrics.datasetType
+        }));
 
-      const fileInput = document.querySelector('input[type="file"]');
-      if (fileInput) fileInput.value = '';
+        toast.success(`Processed ${metrics.totalDocuments} documents with ${metrics.uniqueTokens} unique tokens`);
+        await fetchIndexStats();
+      }
 
     } catch (error) {
-      const errorMessage = error.response?.data?.message || 'Error uploading documents';
-      console.error('Upload Error:', error.response?.data);
-      toast.error(errorMessage);
+      console.error('Upload Error Details:', error);
+      toast.error(error.response?.data?.message || 'Error processing documents');
     } finally {
       setLoading(prev => ({ ...prev, upload: false }));
-      toast.dismiss('uploadProgress');
+      setSelectedFile(null);
+      const fileInput = document.querySelector('input[type="file"]');
+      if (fileInput) fileInput.value = '';
+    }
+  };
+
+  // Add this helper function to check file format
+  const isValidFileFormat = (content) => {
+    try {
+      // Try parsing as JSON
+      JSON.parse(content);
+      return true;
+    } catch (e) {
+      // Check if it's CSV format (simple check)
+      const lines = content.split('\n');
+      if (lines.length > 1) {
+        const headerCount = lines[0].split(',').length;
+        return lines.every(line => line.split(',').length === headerCount);
+      }
+      // Assume it's valid text format
+      return true;
     }
   };
 
@@ -451,10 +551,10 @@ function App() {
           <Settings className="h-5 w-5 text-indigo-600" />
           Search Configuration
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Tokenizer Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
               Tokenizer Type
             </label>
             <select
@@ -468,11 +568,15 @@ function App() {
               <option value="standard">Standard Tokenizer</option>
               <option value="custom">Custom Tokenizer</option>
             </select>
+            <p className="text-sm text-gray-500">
+              Standard: Splits on whitespace
+              Custom: Advanced tokenization with punctuation handling
+            </p>
           </div>
 
           {/* Stemming Toggle */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
               Stemming
             </label>
             <div className="flex items-center">
@@ -487,11 +591,14 @@ function App() {
               />
               <span className="ml-2 text-sm text-gray-600">Enable Stemming</span>
             </div>
+            <p className="text-sm text-gray-500">
+              Reduces words to their root form (e.g., "running" → "run")
+            </p>
           </div>
 
           {/* Ranking Algorithm */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
               Ranking Algorithm
             </label>
             <select
@@ -505,11 +612,15 @@ function App() {
               <option value="tf-idf">TF-IDF</option>
               <option value="tf">Term Frequency</option>
             </select>
+            <p className="text-sm text-gray-500">
+              TF-IDF: Considers term frequency and document frequency
+              TF: Only considers term frequency
+            </p>
           </div>
 
           {/* Length Normalization */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
               Length Normalization
             </label>
             <div className="flex items-center">
@@ -523,6 +634,44 @@ function App() {
                   className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
               />
               <span className="ml-2 text-sm text-gray-600">Enable Length Normalization</span>
+            </div>
+            <p className="text-sm text-gray-500">
+              Adjusts scores based on document length to avoid bias towards longer documents
+            </p>
+          </div>
+        </div>
+
+        {/* Add new evaluation options */}
+        <div className="mt-6 border-t pt-6">
+          <h3 className="text-lg font-medium mb-4">Evaluation Options</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={searchConfig.evaluationMode}
+                  onChange={(e) => setSearchConfig(prev => ({
+                    ...prev,
+                    evaluationMode: e.target.checked
+                  }))}
+                  className="h-4 w-4 text-indigo-600"
+                />
+                <span>Enable Evaluation Mode</span>
+              </label>
+            </div>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={searchConfig.useRelevanceJudgments}
+                  onChange={(e) => setSearchConfig(prev => ({
+                    ...prev,
+                    useRelevanceJudgments: e.target.checked
+                  }))}
+                  className="h-4 w-4 text-indigo-600"
+                />
+                <span>Use Relevance Judgments</span>
+              </label>
             </div>
           </div>
         </div>
@@ -733,6 +882,58 @@ function App() {
       </svg>
   );
 
+  // Add new component for IR Evaluation Results
+  const IREvaluationResults = ({ metrics }) => {
+    if (!metrics?.precisionRecall?.length) return null;
+
+    return (
+      <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+        <h2 className="text-xl font-semibold mb-4">IR System Evaluation</h2>
+        
+        {/* Precision-Recall Graph */}
+        <div className="mb-6">
+          <h3 className="font-medium mb-2">Precision-Recall Curve</h3>
+          {/* Add visualization library implementation here */}
+        </div>
+
+        {/* Indexing Statistics */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h3 className="text-sm font-medium">Time to Index</h3>
+            <p className="text-2xl font-bold text-indigo-600">
+              {metrics.indexingStats.timeToIndex}
+            </p>
+          </div>
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <h3 className="text-sm font-medium">Token Count</h3>
+            <p className="text-2xl font-bold text-indigo-600">
+              {metrics.indexingStats.tokenCount}
+            </p>
+          </div>
+        </div>
+
+        {/* Tokenizer Comparison */}
+        <div className="mb-6">
+          <h3 className="font-medium mb-2">Tokenizer Comparison</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="text-sm font-medium">Standard Tokenizer</h4>
+              <pre className="text-sm mt-2">
+                {JSON.stringify(metrics.tokenizationComparison.standard, null, 2)}
+              </pre>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="text-sm font-medium">Custom Tokenizer</h4>
+              <pre className="text-sm mt-2">
+                {JSON.stringify(metrics.tokenizationComparison.custom, null, 2)}
+              </pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
       <div className="min-h-screen bg-gray-50">
         <Toaster position="top-right" />
@@ -905,6 +1106,9 @@ function App() {
 
           {/* Metrics Visualization */}
           {indexMetrics && <MetricsVisualization metrics={indexMetrics} />}
+
+          {/* Add IR Evaluation Results */}
+          <IREvaluationResults metrics={evaluationMetrics} />
         </div>
 
         {/* Add the dialog component */}

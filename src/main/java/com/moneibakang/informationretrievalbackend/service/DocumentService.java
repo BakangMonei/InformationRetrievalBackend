@@ -50,4 +50,12 @@ public interface DocumentService {
 
     // Method to process uploaded file
     void processUploadedFile(MultipartFile file) throws IOException;
+
+    Map<String, Object> processAndIndexFile(
+        MultipartFile file,
+        String tokenizerType,
+        boolean useStemming,
+        String rankingAlgorithm,
+        boolean lengthNormalization
+    ) throws IOException;
 }

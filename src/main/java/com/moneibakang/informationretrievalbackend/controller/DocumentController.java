@@ -16,6 +16,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/documents")
@@ -124,16 +126,31 @@ public class DocumentController {
 
     // BULK IMPORT - Import multiple documents
     @PostMapping("/bulk")
-    public ResponseEntity<?> bulkImportDocuments(@RequestBody List<DocumentDTO> documents) {
+    public ResponseEntity<?> bulkImportDocuments(@RequestParam("file") MultipartFile file,
+                                               @RequestParam("tokenizerType") String tokenizerType,
+                                               @RequestParam("useStemming") boolean useStemming,
+                                               @RequestParam("rankingAlgorithm") String rankingAlgorithm,
+                                               @RequestParam("lengthNormalization") boolean lengthNormalization) {
         try {
-            if (documents == null || documents.isEmpty()) {
-                return new ResponseEntity<>("No documents provided", HttpStatus.BAD_REQUEST);
+            if (file.isEmpty()) {
+                return new ResponseEntity<>("No file provided", HttpStatus.BAD_REQUEST);
             }
-            List<String> ids = documentService.bulkImportDocuments(documents);
-            return new ResponseEntity<>(ids, HttpStatus.CREATED);
-        } catch (IOException e) {
-            logger.error("Error bulk importing documents", e);
-            return new ResponseEntity<>("Error processing documents: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+
+            // Process the file and get metrics
+            Map<String, Object> processingResults = documentService.processAndIndexFile(
+                file, 
+                tokenizerType, 
+                useStemming, 
+                rankingAlgorithm, 
+                lengthNormalization
+            );
+
+            return ResponseEntity.ok(processingResults);
+        } catch (Exception e) {
+            logger.error("Error processing file upload", e);
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Error processing file: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 
