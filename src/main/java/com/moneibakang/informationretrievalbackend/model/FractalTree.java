@@ -8,8 +8,10 @@ package com.moneibakang.informationretrievalbackend.model;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
 import javax.swing.*;
-import java.util.Random;
+import java.io.*;
+import java.util.*;
 
 public class FractalTree extends JPanel {
     private static final int WIDTH = 1920;
@@ -101,13 +103,13 @@ public class FractalTree extends JPanel {
         // saveAsImage(panel);
     }
 
-    private static void saveAsImage(FractalTree panel) {
+    private static void saveAsImage(FractalTree panel) throws IOException {
         BufferedImage image = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
         Graphics2D g2d = image.createGraphics();
         panel.paint(g2d);
         g2d.dispose();
 
         // Code to save image would go here
-        // ImageIO.write(image, "png", new File("fractal_tree.png"));
+         ImageIO.write(image, "png", new File("fractal_tree.png"));
     }
 }
