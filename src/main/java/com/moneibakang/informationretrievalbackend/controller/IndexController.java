@@ -81,7 +81,7 @@ public class IndexController {
             // Use the provided filePath or fall back to the default one from properties
             String path = (filePath != null && !filePath.isEmpty())
                     ? filePath
-                    : "src/main/resources/pubmed25n0002.xml";
+                    : "src/main/resources/pubmed25n0006.xml";
             indexService.importPubMedCollection(path);
             return new ResponseEntity<>("PUBMED collection imported successfully", HttpStatus.OK);
         } catch (IOException e) {
@@ -124,16 +124,11 @@ public class IndexController {
     // Configure ranking algorithm
     @PutMapping("/config/ranking")
     public ResponseEntity<Void> configureRanking(@RequestBody Map<String, String> config) {
-        try {
-            String algorithm = config.get("algorithm");
-            if (algorithm != null) {
-                documentService.configureRankingAlgorithm(algorithm);
-            }
-            return new ResponseEntity<>(HttpStatus.OK);
-        } catch (IOException e) {
-            logger.error("Error configuring ranking algorithm", e);
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        String algorithm = config.get("algorithm");
+        if (algorithm != null) {
+            documentService.configureRankingAlgorithm(algorithm);
         }
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 
     // Configure length normalization

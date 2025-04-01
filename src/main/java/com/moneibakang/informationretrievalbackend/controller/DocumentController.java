@@ -7,6 +7,7 @@ package com.moneibakang.informationretrievalbackend.controller;
 
 import com.moneibakang.informationretrievalbackend.dto.*;
 import com.moneibakang.informationretrievalbackend.exception.*;
+import com.moneibakang.informationretrievalbackend.model.Document;
 import com.moneibakang.informationretrievalbackend.service.*;
 import org.slf4j.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,8 +35,8 @@ public class DocumentController {
     @PostMapping
     public ResponseEntity<DocumentDTO> createDocument(@RequestBody DocumentDTO documentDTO) {
         try {
-            DocumentDTO createdDoc = documentService.createDocument(documentDTO);
-            return new ResponseEntity<>(createdDoc, HttpStatus.CREATED);
+            Document doc = documentService.save(documentDTO.toDocument());
+            return new ResponseEntity<>(new DocumentDTO(doc), HttpStatus.CREATED);
         } catch (IOException e) {
             logger.error("Error creating document", e);
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -46,11 +47,8 @@ public class DocumentController {
     @GetMapping("/{id}")
     public ResponseEntity<DocumentDTO> getDocumentById(@PathVariable String id) {
         try {
-            DocumentDTO doc = documentService.getDocumentById(id);
-            return new ResponseEntity<>(doc, HttpStatus.OK);
-        } catch (DocumentNotFoundException e) {
-            logger.warn("Document not found: {}", id);
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            Document doc = documentService.findById(id);
+            return new ResponseEntity<>(new DocumentDTO(doc), HttpStatus.OK);
         } catch (IOException e) {
             logger.error("Error getting document: {}", id, e);
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -61,8 +59,11 @@ public class DocumentController {
     @GetMapping
     public ResponseEntity<List<DocumentDTO>> getAllDocuments() {
         try {
-            List<DocumentDTO> docs = documentService.getAllDocuments();
-            return new ResponseEntity<>(docs, HttpStatus.OK);
+            List<Document> docs = documentService.findAll();
+            List<DocumentDTO> dtos = docs.stream()
+                    .map(DocumentDTO::new)
+                    .toList();
+            return new ResponseEntity<>(dtos, HttpStatus.OK);
         } catch (IOException e) {
             logger.error("Error getting all documents", e);
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -73,10 +74,10 @@ public class DocumentController {
     @PutMapping("/{id}")
     public ResponseEntity<DocumentDTO> updateDocument(@PathVariable String id, @RequestBody DocumentDTO documentDTO) {
         try {
-            DocumentDTO updatedDoc = documentService.updateDocument(id, documentDTO);
-            return new ResponseEntity<>(updatedDoc, HttpStatus.OK);
-        } catch (DocumentNotFoundException e) {
-            logger.warn("Document not found for update: {}", id);
+            Document updatedDoc = documentService.updateDocument(id, documentDTO);
+            if (updatedDoc != null) {
+                return new ResponseEntity<>(new DocumentDTO(updatedDoc), HttpStatus.OK);
+            }
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         } catch (IOException e) {
             logger.error("Error updating document: {}", id, e);
@@ -88,11 +89,8 @@ public class DocumentController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteDocument(@PathVariable String id) {
         try {
-            documentService.deleteDocument(id);
+            documentService.deleteById(id);
             return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        } catch (DocumentNotFoundException e) {
-            logger.warn("Document not found for deletion: {}", id);
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         } catch (IOException e) {
             logger.error("Error deleting document: {}", id, e);
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -105,17 +103,17 @@ public class DocumentController {
             @RequestParam(value = "q", required = false) String query,
             @RequestBody(required = false) SearchRequestDTO searchRequest) {
         try {
-            // Handle both GET and POST requests
-            SearchRequestDTO finalRequest;
-            if (searchRequest == null) {
-                finalRequest = new SearchRequestDTO();
+            SearchRequestDTO finalRequest = searchRequest != null ? searchRequest : new SearchRequestDTO();
+            if (query != null) {
                 finalRequest.setQuery(query);
-            } else {
-                finalRequest = searchRequest;
             }
             
-            SearchResponseDTO searchResponse = documentService.searchDocuments(finalRequest);
-            return new ResponseEntity<>(searchResponse, HttpStatus.OK);
+            List<Document> results = documentService.searchDocuments(finalRequest);
+            SearchResponseDTO response = new SearchResponseDTO();
+            response.setDocuments(results.stream()
+                    .map(DocumentDTO::new)
+                    .toList());
+            return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (IOException e) {
             logger.error("Error searching documents", e);
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -134,8 +132,7 @@ public class DocumentController {
                 return new ResponseEntity<>("No file provided", HttpStatus.BAD_REQUEST);
             }
 
-            // Process the file and get metrics
-            Map<String, Object> processingResults = documentService.processAndIndexFile(
+            List<Document> processedDocs = documentService.processAndIndexFile(
                 file, 
                 tokenizerType, 
                 useStemming, 
@@ -143,11 +140,10 @@ public class DocumentController {
                 lengthNormalization
             );
 
-            return ResponseEntity.ok(processingResults);
+            return ResponseEntity.ok(processedDocs);
         } catch (Exception e) {
             logger.error("Error processing file upload", e);
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Error processing file: " + e.getMessage());
+            Map<String, String> errorResponse = Map.of("message", "Error processing file: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
@@ -159,7 +155,6 @@ public class DocumentController {
             return new ResponseEntity<>("No file uploaded", HttpStatus.BAD_REQUEST);
         }
         try {
-            // Process the file (you will need to implement this logic)
             documentService.processUploadedFile(file);
             return new ResponseEntity<>("File uploaded successfully", HttpStatus.OK);
         } catch (IOException e) {

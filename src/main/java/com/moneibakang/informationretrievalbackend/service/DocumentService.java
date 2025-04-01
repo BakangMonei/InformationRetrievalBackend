@@ -7,55 +7,38 @@ package com.moneibakang.informationretrievalbackend.service;
  */
 
 import com.moneibakang.informationretrievalbackend.dto.*;
+import com.moneibakang.informationretrievalbackend.model.Document;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
 import java.util.*;
-import org.springframework.web.multipart.MultipartFile;
 
 public interface DocumentService {
-    // CRUD operations
-    DocumentDTO createDocument(DocumentDTO documentDTO) throws IOException;
-
-    DocumentDTO getDocumentById(String id) throws IOException;
-
-    List<DocumentDTO> getAllDocuments() throws IOException;
-
-    DocumentDTO updateDocument(String id, DocumentDTO documentDTO) throws IOException;
-
-    void deleteDocument(String id) throws IOException;
-
-    // Search operations
-    SearchResponseDTO searchDocuments(SearchRequestDTO searchRequest) throws IOException;
-
-    // Configuration operations
-    void configureTokenizer(String type) throws IOException;
-
-    void configureStemming(boolean enabled) throws IOException;
-
-    void configureRankingAlgorithm(String algorithm) throws IOException;
-
-    void configureLengthNormalization(boolean enabled) throws IOException;
-
-    // Bulk operations
-    List<String> bulkImportDocuments(List<DocumentDTO> documents) throws IOException;
-
-    // Stats operations
+    // Basic CRUD operations
+    Document save(Document document) throws IOException;
+    List<Document> saveAll(List<Document> documents) throws IOException;
+    Document findById(String id) throws IOException;
+    List<Document> findAll() throws IOException;
+    void deleteById(String id) throws IOException;
+    void deleteAll() throws IOException;
+    
+    // Search and indexing operations
+    List<Document> searchDocuments(SearchRequestDTO searchRequest) throws IOException;
     Map<String, Object> getIndexStatistics() throws IOException;
-
-    // Configuration getters
-    String getCurrentTokenizerType();
-    boolean isStemmingEnabled();
+    List<Document> processAndIndexFile(MultipartFile file, String dataset, boolean useStemming, String rankingAlgorithm, boolean lengthNormalization) throws IOException;
+    
+    // Configuration operations
     String getCurrentRankingAlgorithm();
+    void configureRankingAlgorithm(String algorithm);
     boolean isLengthNormalizationEnabled();
-
-    // Method to process uploaded file
-    void processUploadedFile(MultipartFile file) throws IOException;
-
-    Map<String, Object> processAndIndexFile(
-        MultipartFile file,
-        String tokenizerType,
-        boolean useStemming,
-        String rankingAlgorithm,
-        boolean lengthNormalization
-    ) throws IOException;
+    String getCurrentTokenizerType();
+    void configureTokenizer(String type) throws IOException;
+    boolean isStemmingEnabled();
+    void configureStemming(boolean enabled) throws IOException;
+    void configureLengthNormalization(boolean enabled) throws IOException;
+    
+    // Document processing operations
+    List<Document> bulkImportDocuments(List<DocumentDTO> documents) throws IOException;
+    Document updateDocument(String id, DocumentDTO documentDTO) throws IOException;
+    List<Document> processUploadedFile(MultipartFile file) throws IOException;
 }

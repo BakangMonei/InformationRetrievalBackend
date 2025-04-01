@@ -6,62 +6,43 @@ package com.moneibakang.informationretrievalbackend.dto;
  */
 
 import java.util.*;
+import lombok.Data;
 
+@Data
 public class SearchResponseDTO {
-    private List<DocumentDTO> results;
-    private int totalHits, page, totalPages;
-    private double queryTime; // in milliseconds
-    private Map<String, Object> metrics; // For precision-recall data
+    private List<DocumentDTO> documents;
+    private long totalHits;
+    private double searchTime;
+    private Map<String, Object> metrics;
 
-    // Constructors
     public SearchResponseDTO() {
+        this.totalHits = 0;
+        this.searchTime = 0.0;
     }
 
-    public SearchResponseDTO(List<DocumentDTO> results, int totalHits, double queryTime) {
-        this.results = results;
-        this.totalHits = totalHits;
-        this.queryTime = queryTime;
+    public List<DocumentDTO> getDocuments() {
+        return documents;
     }
 
-    // Getters and Setters
-    public List<DocumentDTO> getResults() {
-        return results;
+    public void setDocuments(List<DocumentDTO> documents) {
+        this.documents = documents;
+        this.totalHits = documents != null ? documents.size() : 0;
     }
 
-    public void setResults(List<DocumentDTO> results) {
-        this.results = results;
-    }
-
-    public int getTotalHits() {
+    public long getTotalHits() {
         return totalHits;
     }
 
-    public void setTotalHits(int totalHits) {
+    public void setTotalHits(long totalHits) {
         this.totalHits = totalHits;
     }
 
-    public double getQueryTime() {
-        return queryTime;
+    public double getSearchTime() {
+        return searchTime;
     }
 
-    public void setQueryTime(double queryTime) {
-        this.queryTime = queryTime;
-    }
-
-    public int getPage() {
-        return page;
-    }
-
-    public void setPage(int page) {
-        this.page = page;
-    }
-
-    public int getTotalPages() {
-        return totalPages;
-    }
-
-    public void setTotalPages(int totalPages) {
-        this.totalPages = totalPages;
+    public void setSearchTime(double searchTime) {
+        this.searchTime = searchTime;
     }
 
     public Map<String, Object> getMetrics() {

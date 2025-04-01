@@ -7,19 +7,38 @@ package com.moneibakang.informationretrievalbackend.util;
  */
 
 
-import org.apache.lucene.document.Document;
-import org.apache.lucene.index.DirectoryReader;
+import com.moneibakang.informationretrievalbackend.model.Document;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.Term;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.search.*;
 import org.apache.lucene.store.Directory;
-
-import java.io.*;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
+import org.apache.lucene.index.DirectoryReader;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.*;
 
 /**
  * Utility class for Lucene operations
  */
 public class LuceneUtils {
+
+    private static final String INDEX_PATH = "lucene-index";
+    private static final String ID_FIELD = "id";
+    private static final String TITLE_FIELD = "title";
+    private static final String AUTHOR_FIELD = "author";
+    private static final String CONTENT_FIELD = "content";
 
     /**
      * Calculate term frequency for a specific term in the corpus
@@ -66,13 +85,10 @@ public class LuceneUtils {
         Map<String, Long> termFrequencies = new HashMap<>();
 
         try (IndexReader reader = DirectoryReader.open(directory)) {
-            // This is a simplified implementation - in a real system, you'd use
-            // TermVectors or HighFrequencyTerms for better performance
             for (int i = 0; i < reader.maxDoc(); i++) {
-                Document doc = reader.document(i);
+                org.apache.lucene.document.Document doc = reader.storedFields().document(i);
                 String content = doc.get(field);
                 if (content != null) {
-                    // Simple tokenization by whitespace for demonstration
                     String[] terms = content.split("\\s+");
                     for (String term : terms) {
                         term = term.toLowerCase();
@@ -82,16 +98,83 @@ public class LuceneUtils {
             }
         }
 
-        // Sort by frequency and take top N
         return termFrequencies.entrySet().stream()
                 .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
                 .limit(n)
                 .collect(HashMap::new, (m, e) -> m.put(e.getKey(), e.getValue()), HashMap::putAll);
     }
 
-/**
- * Calculate precision and recall for a search result
- *
- * @param searchResults The search results
- */
+
+
+    public static List<Document> convertTopDocsToDocuments(TopDocs topDocs, IndexSearcher searcher) throws IOException {
+        List<Document> documents = new ArrayList<>();
+        for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
+            org.apache.lucene.document.Document luceneDoc = searcher.storedFields().document(scoreDoc.doc);
+            documents.add(convertToDocument(luceneDoc));
+        }
+        return documents;
+    }
+
+    public static Document getDocument(IndexReader reader, int docId) throws IOException {
+        org.apache.lucene.document.Document luceneDoc = reader.storedFields().document(docId);
+        return convertToDocument(luceneDoc);
+    }
+
+    public static void createIndex(List<Document> documents) throws IOException {
+        Path indexPath = Paths.get(INDEX_PATH);
+        Directory dir = FSDirectory.open(indexPath);
+        StandardAnalyzer analyzer = new StandardAnalyzer();
+        IndexWriterConfig config = new IndexWriterConfig(analyzer);
+        IndexWriter writer = new IndexWriter(dir, config);
+
+        for (Document doc : documents) {
+            org.apache.lucene.document.Document luceneDoc = new org.apache.lucene.document.Document();
+            luceneDoc.add(new StringField(ID_FIELD, doc.getId(), Field.Store.YES));
+            luceneDoc.add(new TextField(TITLE_FIELD, doc.getTitle(), Field.Store.YES));
+            luceneDoc.add(new TextField(AUTHOR_FIELD, doc.getAuthor(), Field.Store.YES));
+            luceneDoc.add(new TextField(CONTENT_FIELD, doc.getContent(), Field.Store.YES));
+            writer.addDocument(luceneDoc);
+        }
+
+        writer.close();
+        dir.close();
+        analyzer.close();
+    }
+
+    public static List<Document> search(String query, String rankingAlgorithm) throws IOException {
+        Path indexPath = Paths.get(INDEX_PATH);
+        Directory dir = FSDirectory.open(indexPath);
+        IndexReader reader = DirectoryReader.open(dir);
+        IndexSearcher searcher = new IndexSearcher(reader);
+
+        // Create query
+        BooleanQuery.Builder queryBuilder = new BooleanQuery.Builder();
+        String[] terms = query.toLowerCase().split("\\s+");
+        for (String term : terms) {
+            queryBuilder.add(new TermQuery(new Term(CONTENT_FIELD, term)), BooleanClause.Occur.SHOULD);
+        }
+        Query luceneQuery = queryBuilder.build();
+
+        // Search
+        TopDocs results = searcher.search(luceneQuery, 100);
+        List<Document> documents = new ArrayList<>();
+
+        for (ScoreDoc scoreDoc : results.scoreDocs) {
+            org.apache.lucene.document.Document luceneDoc = reader.storedFields().document(scoreDoc.doc);
+            documents.add(convertToDocument(luceneDoc));
+        }
+
+        reader.close();
+        dir.close();
+        return documents;
+    }
+
+    private static Document convertToDocument(org.apache.lucene.document.Document luceneDoc) {
+        Document doc = new Document();
+        doc.setId(luceneDoc.get(ID_FIELD));
+        doc.setTitle(luceneDoc.get(TITLE_FIELD));
+        doc.setAuthor(luceneDoc.get(AUTHOR_FIELD));
+        doc.setContent(luceneDoc.get(CONTENT_FIELD));
+        return doc;
+    }
 }

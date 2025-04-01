@@ -1,29 +1,115 @@
 package com.moneibakang.informationretrievalbackend.controller;
 
-import java.io.File;
-import java.io.IOException;
-
-import org.springframework.http.HttpStatus;
+import com.moneibakang.informationretrievalbackend.model.Document;
+import com.moneibakang.informationretrievalbackend.service.FileProcessingService;
+import com.moneibakang.informationretrievalbackend.service.DocumentService;
+import com.moneibakang.informationretrievalbackend.dto.DocumentDTO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.xml.sax.SAXException;
+
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/files")
+@RequestMapping("/api/upload")
+@CrossOrigin(origins = "*")
 public class FileUploadController {
 
-    @PostMapping("/upload")
-    public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
-        // Save file to a directory
-        String filePath = "uploaded_files/" + file.getOriginalFilename();
+    @Autowired
+    private FileProcessingService fileProcessingService;
+
+    @Autowired
+    private DocumentService documentService;
+
+    @PostMapping("/cisi")
+    public ResponseEntity<?> uploadCisiFile(@RequestParam("file") MultipartFile file) {
         try {
-            file.transferTo(new File(filePath));
-            return ResponseEntity.ok("File uploaded successfully: " + filePath);
+            List<Document> documents = fileProcessingService.processCisiFile(file);
+            List<DocumentDTO> documentDTOs = documents.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+            documentService.bulkImportDocuments(documentDTOs);
+            return ResponseEntity.ok(Map.of(
+                "message", "Successfully processed CISI file",
+                "documentCount", documentDTOs.size(),
+                "documentIds", documentDTOs.stream().map(DocumentDTO::getId).collect(Collectors.toList())
+            ));
         } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("File upload failed");
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Failed to process CISI file",
+                "message", e.getMessage()
+            ));
         }
+    }
+
+    @PostMapping("/pubmed")
+    public ResponseEntity<?> uploadPubMedFile(@RequestParam("file") MultipartFile file) {
+        try {
+            List<Document> documents = fileProcessingService.processPubMedXmlFile(file);
+            List<DocumentDTO> documentDTOs = documents.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+            documentService.bulkImportDocuments(documentDTOs);
+            return ResponseEntity.ok(Map.of(
+                "message", "Successfully processed PubMed file",
+                "documentCount", documentDTOs.size(),
+                "documentIds", documentDTOs.stream().map(DocumentDTO::getId).collect(Collectors.toList())
+            ));
+        } catch (IOException | ParserConfigurationException | SAXException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Failed to process PubMed file",
+                "message", e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/queries")
+    public ResponseEntity<?> uploadQueryFile(@RequestParam("file") MultipartFile file) {
+        try {
+            List<String> queries = fileProcessingService.processQueryFile(file);
+            return ResponseEntity.ok(Map.of(
+                "message", "Successfully processed query file",
+                "queryCount", queries.size(),
+                "queries", queries
+            ));
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Failed to process query file",
+                "message", e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/relevance")
+    public ResponseEntity<?> uploadRelevanceFile(@RequestParam("file") MultipartFile file) {
+        try {
+            List<FileProcessingService.RelevanceJudgment> judgments = 
+                fileProcessingService.processRelevanceFile(file);
+            return ResponseEntity.ok(Map.of(
+                "message", "Successfully processed relevance file",
+                "judgmentCount", judgments.size(),
+                "judgments", judgments
+            ));
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Failed to process relevance file",
+                "message", e.getMessage()
+            ));
+        }
+    }
+
+    private DocumentDTO convertToDTO(Document doc) {
+        DocumentDTO dto = new DocumentDTO();
+        dto.setId(doc.getId());
+        dto.setTitle(doc.getTitle());
+        dto.setAuthor(doc.getAuthor());
+        dto.setContent(doc.getContent());
+        return dto;
     }
 }

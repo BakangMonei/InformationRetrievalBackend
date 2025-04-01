@@ -6,11 +6,20 @@ package com.moneibakang.informationretrievalbackend.dto;
  */
 
 import com.moneibakang.informationretrievalbackend.model.Document;
+import lombok.Data;
 
+@Data
 public class DocumentDTO {
-    private String id, title, content, collection, author;
+    private String id;
+    private String title;
+    private String content;
+    private String author;
+    private String dataset;
+    private String collection;
     private long timestamp;
-    private double score; // For search results
+    private long indexingTime;
+    private int tokenCount;
+    private boolean stemmed;
 
     // Default constructor
     public DocumentDTO() {
@@ -24,12 +33,6 @@ public class DocumentDTO {
         this.collection = document.getCollection();
         this.author = document.getAuthor();
         this.timestamp = document.getTimestamp();
-    }
-
-    // Conversion constructor with score
-    public DocumentDTO(Document document, double score) {
-        this(document);
-        this.score = score;
     }
 
     // Convert DTO to Document model
@@ -83,14 +86,6 @@ public class DocumentDTO {
 
     public void setAuthor(String author) {
         this.author = author;
-    }
-
-    public double getScore() {
-        return score;
-    }
-
-    public void setScore(double score) {
-        this.score = score;
     }
 
     public long getTimestamp() {

@@ -6,22 +6,33 @@ package com.moneibakang.informationretrievalbackend.model;
  */
 
 import java.io.*;
+import lombok.Data;
 
+@Data
 public class Document implements Serializable {
-    private String id, title, content, collection, author;
+    private String id;
+    private String title;
+    private String content;
+    private String author;
+    private String dataset; // CISI or MEDLINE
+    private String collection; // Collection name
     private long timestamp;
+    private long indexingTime;
+    private int tokenCount;
+    private boolean stemmed;
 
     // Default constructor
     public Document() {
+        this.timestamp = System.currentTimeMillis();
     }
 
     // Parameterized constructor
-    public Document(String id, String title, String content, String collection, String author) {
+    public Document(String id, String title, String content, String author, String collection) {
         this.id = id;
         this.title = title;
         this.content = content;
-        this.collection = collection;
         this.author = author;
+        this.collection = collection;
         this.timestamp = System.currentTimeMillis();
     }
 
@@ -50,14 +61,6 @@ public class Document implements Serializable {
         this.content = content;
     }
 
-    public String getCollection() {
-        return collection;
-    }
-
-    public void setCollection(String collection) {
-        this.collection = collection;
-    }
-
     public String getAuthor() {
         return author;
     }
@@ -66,12 +69,12 @@ public class Document implements Serializable {
         this.author = author;
     }
 
-    public long getTimestamp() {
-        return timestamp;
+    public long getIndexingTime() {
+        return indexingTime;
     }
 
-    public void setTimestamp(long timestamp) {
-        this.timestamp = timestamp;
+    public void setIndexingTime(long indexingTime) {
+        this.indexingTime = indexingTime;
     }
 
     @Override
@@ -79,7 +82,6 @@ public class Document implements Serializable {
         return "Document{" +
                 "id='" + id + '\'' +
                 ", title='" + title + '\'' +
-                ", collection='" + collection + '\'' +
                 ", author='" + author + '\'' +
                 '}';
     }
