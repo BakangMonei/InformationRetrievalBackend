@@ -1,296 +1,129 @@
-# Information Retrieval System API Documentation
+# Information Retrieval Backend
 
-## Base URL
-`http://localhost:8080/api`
+Production-oriented Spring Boot backend for an Information Retrieval (IR) platform using Apache Lucene.
 
-## Document Management Endpoints
+## What This Backend Supports
 
-### 1. Documents (`/api/documents`)
-#### POST
-- **Description:** Creates a new document
-- **Request Body:**
+- Full CRUD for `Document`, `Query`, and `Result` records
+- Index build/rebuild and index status observability
+- Search and retrieval with configurable ranking and refinement
+- Query expansion (pseudo-relevance feedback style)
+- Evaluation endpoints (Precision, Recall, F1, MAP, PR curve)
+- Term distribution and Zipf-style analytics
+- Standard API envelope for consistent responses
+
+## Architecture
+
+- **Controller Layer**: REST APIs
+- **Service Layer**: business + IR logic (`IRPlatformService`)
+- **Repository Layer**: persistence abstraction (`LuceneDocumentRepository`)
+- **IR Engine Layer**: Lucene indexing and retrieval internals
+
+Legacy `/api/*` endpoints remain available for backward compatibility.
+New modular platform endpoints are exposed from root paths.
+
+## API Base URL
+
+`http://localhost:8080`
+
+## Standard Response Format
+
 ```json
 {
-    "title": "Sample Document",
-    "content": "Document content here",
-    "author": "John Doe",
-    "collection": "general"
-}
-```
-- **Response:** `201 Created`
-
-#### GET
-- **Description:** Retrieves all documents (with pagination)
-- **Query Parameters:** 
-  - `page` (default: 0)
-  - `size` (default: 10)
-- **Response:** `200 OK`
-```json
-{
-    "content": [
-        {
-            "id": "123",
-            "title": "Sample Document",
-            "content": "Content...",
-            "author": "John Doe",
-            "collection": "general"
-        }
-    ],
-    "totalPages": 5,
-    "totalElements": 50,
-    "currentPage": 0
+  "success": true,
+  "data": {},
+  "message": "..."
 }
 ```
 
-### 2. Bulk Document Upload (`/api/documents/bulk`)
-#### POST
-- **Description:** Uploads multiple documents at once
-- **Request Body:** Array of documents
-```json
-[
-    {
-        "title": "Document 1",
-        "content": "Content 1"
-    },
-    {
-        "title": "Document 2",
-        "content": "Content 2"
-    }
-]
-```
-- **Response:** `201 Created`
+## New Endpoint Coverage
 
-### 3. Document Search (`/api/documents/search`)
-#### POST
-- **Description:** Searches documents based on query and parameters
-- **Request Body:**
-```json
-{
-    "query": "search terms",
-    "collection": "general",
-    "rankingAlgorithm": "tf-idf",
-    "tokenizerType": "standard",
-    "useStemming": false,
-    "applyLengthNormalization": true,
-    "resultsPerPage": 10,
-    "page": 0
-}
-```
+### Document CRUD
+- `POST /documents`
+- `GET /documents`
+- `GET /documents/{id}`
+- `PUT /documents/{id}`
+- `DELETE /documents/{id}`
 
-### 4. Single Document Operations (`/api/documents/{id}`)
-#### GET
-- **Description:** Retrieves a specific document
-- **Response:** `200 OK`
+### Query CRUD
+- `POST /queries`
+- `GET /queries`
+- `GET /queries/{id}`
+- `PUT /queries/{id}`
+- `DELETE /queries/{id}`
 
-#### PUT
-- **Description:** Updates a specific document
-- **Request Body:** Updated document details
+### Result CRUD
+- `POST /results`
+- `GET /results`
+- `GET /results/{id}`
+- `PUT /results/{id}`
+- `DELETE /results/{id}`
 
-#### DELETE
-- **Description:** Deletes a specific document
-- **Response:** `204 No Content`
+### Indexing
+- `POST /index/build`
+- `GET /index/status`
 
-## Index Configuration Endpoints
+### Search and Retrieval
+- `GET /search`
+  - Required: `query`
+  - Optional:
+    - `model=tf|tfidf|normalized|bm25`
+    - `stemming=true|false`
+    - `expansion=true|false`
+    - `category`, `year`
+    - `keywords`, `operator=AND|OR`
+    - `page`, `size`
 
-### 1. Normalization Configuration (`/api/index/config/normalization`)
-#### GET
-- **Description:** Gets current normalization settings
-#### PUT
-- **Description:** Updates normalization settings
-```json
-{
-    "enabled": true
-}
-```
+### Query Expansion
+- `POST /search/expand?query=...`
 
-### 2. Ranking Configuration (`/api/index/config/ranking`)
-#### GET
-- **Description:** Gets current ranking algorithm
-#### PUT
-- **Description:** Sets ranking algorithm
-```json
-{
-    "algorithm": "tf-idf"  // or "bm25"
-}
-```
+### Evaluation
+- `POST /evaluation/run`
+- `GET /evaluation/metrics`
+- `GET /evaluation/pr-curve`
 
-### 3. Stemming Configuration (`/api/index/config/stemming`)
-#### GET
-- **Description:** Gets stemming status
-#### PUT
-- **Description:** Enables/disables stemming
-```json
-{
-    "enabled": true
-}
-```
+### Analytics
+- `GET /analytics/term-distribution`
+- `GET /analytics/zipf`
 
-### 4. Tokenizer Configuration (`/api/index/config/tokenizer`)
-#### GET
-- **Description:** Gets current tokenizer type
-#### PUT
-- **Description:** Sets tokenizer type
-```json
-{
-    "type": "standard"  // "whitespace", "simple"
-}
-```
+## Quick Start
 
-## Index Management Endpoints
-
-### 1. Health Check (`/api/index/health`)
-#### GET
-- **Description:** Checks system health
-- **Response:**
-```json
-{
-    "status": "UP",
-    "details": {
-        "indexSize": "1.2GB",
-        "documentCount": 1000
-    }
-}
-```
-
-### 2. Import Data (`/api/index/import`)
-#### POST `/api/index/import/cisi`
-- **Description:** Imports documents from CISI dataset
-- **Response:** `200 OK`
-```json
-{
-    "imported": 1460,
-    "failed": 0,
-    "timeElapsed": "5.2s"
-}
-```
-
-#### POST `/api/index/import/pubmed`
-- **Description:** Imports documents from PubMed dataset
-- **Response:** `200 OK`
-```json
-{
-    "imported": 2500,
-    "failed": 0,
-    "timeElapsed": "8.7s"
-}
-```
-
-### 3. Index Metrics (`/api/index/metrics`)
-#### GET
-- **Description:** Retrieves performance metrics of the index
-- **Response:** `200 OK`
-```json
-{
-    "averageQueryTime": "45ms",
-    "indexSize": "1.2GB",
-    "memoryUsage": "856MB",
-    "cacheHitRate": "85%"
-}
-```
-
-### 4. Recreate Index (`/api/index/recreate`)
-#### POST
-- **Description:** Rebuilds the entire index from scratch
-- **Response:** `200 OK`
-```json
-{
-    "status": "success",
-    "timeElapsed": "2m 15s",
-    "documentsReindexed": 3960
-}
-```
-
-### 5. Index Statistics (`/api/index/stats`)
-#### GET
-- **Description:** Retrieves statistical information about the index
-- **Response:** `200 OK`
-```json
-{
-    "totalDocuments": 3960,
-    "collections": {
-        "general": 1500,
-        "academic": 2460
-    },
-    "uniqueTerms": 45678,
-    "averageDocumentLength": 850,
-    "lastUpdated": "2024-03-20T15:30:00Z"
-}
-```
-
-## Error Responses
-
-### 400 Bad Request
-```json
-{
-    "status": 400,
-    "message": "Invalid request parameters",
-    "details": "Specific error details"
-}
-```
-
-### 404 Not Found
-```json
-{
-    "status": 404,
-    "message": "Resource not found",
-    "details": "The requested resource could not be found"
-}
-```
-
-### 500 Internal Server Error
-```json
-{
-    "status": 500,
-    "message": "Internal server error",
-    "details": "An unexpected error occurred"
-}
-```
-
-## Usage Examples
-
-### Configuring and Searching
+### Run
 ```bash
-# 1. Configure the system
-curl -X PUT http://localhost:8080/api/index/config/tokenizer \
-     -H "Content-Type: application/json" \
-     -d '{"type": "standard"}'
-
-# 2. Import CISI dataset
-curl -X POST http://localhost:8080/api/index/import/cisi
-
-# 3. Search documents
-curl -X POST http://localhost:8080/api/documents/search \
-     -H "Content-Type: application/json" \
-     -d '{
-         "query": "information retrieval systems",
-         "rankingAlgorithm": "bm25",
-         "useStemming": true,
-         "page": 0,
-         "resultsPerPage": 10
-     }'
+./mvnw spring-boot:run
 ```
 
-### Managing Documents
+### Build
+```bash
+./mvnw clean package
+```
+
+### OpenAPI / Swagger UI
+- [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
+
+## Example Requests
+
 ```bash
 # Create a document
-curl -X POST http://localhost:8080/api/documents \
-     -H "Content-Type: application/json" \
-     -d '{
-         "title": "New Research Paper",
-         "content": "Content of the research paper...",
-         "collection": "academic"
-     }'
+curl -X POST http://localhost:8080/documents \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title":"Lucene BM25 Notes",
+    "content":"BM25 generally outperforms plain TF in many corpora.",
+    "author":"IR Team",
+    "collection":"academic",
+    "dataset":"CISI"
+  }'
 
-# Get index statistics
-curl http://localhost:8080/api/index/stats
+# Search with filtering + ranking model
+curl "http://localhost:8080/search?query=lucene%20ranking&model=bm25&stemming=true&expansion=true&category=academic&operator=AND&page=0&size=10"
 
-# Check system health
-curl http://localhost:8080/api/index/health
+# Get index status
+curl http://localhost:8080/index/status
 ```
 
-Note: All examples assume the server is running on localhost:8080. Adjust the URL according to your deployment environment.
+## Notes
 
-
-
-
-imageee_for_sos.png
+- Document validation requires non-empty `title` and `content`.
+- Logging includes search latency and indexing metrics.
+- Existing `index` and dataset import logic remain available in legacy controllers.

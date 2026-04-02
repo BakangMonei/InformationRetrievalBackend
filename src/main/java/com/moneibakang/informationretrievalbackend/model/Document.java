@@ -1,17 +1,20 @@
 package com.moneibakang.informationretrievalbackend.model;
 /*
  * @Author: Monei Bakang
- * @Date: 16 March 2025
+ * @Date: 16 March 2026
  * @Time: 07:21 hours
  */
 
 import java.io.*;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
 public class Document implements Serializable {
     private String id;
+    @NotBlank(message = "title is required")
     private String title;
+    @NotBlank(message = "content is required")
     private String content;
     private String author;
     private String dataset; // CISI or MEDLINE

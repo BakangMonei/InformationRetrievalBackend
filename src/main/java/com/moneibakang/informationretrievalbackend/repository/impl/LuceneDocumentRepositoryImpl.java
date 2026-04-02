@@ -170,6 +170,10 @@ public class LuceneDocumentRepositoryImpl implements LuceneDocumentRepository {
         luceneDoc.add(new StringField("dataset", document.getDataset(), Field.Store.YES));
         luceneDoc.add(new StringField("collection", document.getCollection(), Field.Store.YES));
         luceneDoc.add(new StringField("timestamp", String.valueOf(document.getTimestamp()), Field.Store.YES));
+        int year = java.time.Instant.ofEpochMilli(document.getTimestamp())
+                .atZone(java.time.ZoneId.systemDefault())
+                .getYear();
+        luceneDoc.add(new StringField("year", String.valueOf(year), Field.Store.YES));
         return luceneDoc;
     }
 

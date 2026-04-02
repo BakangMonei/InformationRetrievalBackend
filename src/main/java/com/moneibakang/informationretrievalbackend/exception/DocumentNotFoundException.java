@@ -1,7 +1,7 @@
 package com.moneibakang.informationretrievalbackend.exception;
 /*
  * @Author: Monei Bakang
- * @Date: 16 March 2025
+ * @Date: 16 March 2026
  * @Time: 07:21 hours
  */
 
