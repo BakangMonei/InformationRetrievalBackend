@@ -8,6 +8,8 @@ import com.moneibakang.informationretrievalbackend.model.QueryRecord;
 import com.moneibakang.informationretrievalbackend.model.ResultRecord;
 import com.moneibakang.informationretrievalbackend.service.IRPlatformService;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,6 +29,7 @@ import java.util.Map;
 @RestController
 @RequestMapping
 public class IRPlatformController {
+    private static final Logger log = LoggerFactory.getLogger(IRPlatformController.class);
     private final IRPlatformService service;
 
     public IRPlatformController(IRPlatformService service) {
@@ -35,8 +38,9 @@ public class IRPlatformController {
 
     @PostMapping("/documents")
     public ResponseEntity<ApiResponse<Document>> createDocument(@Valid @RequestBody Document document) throws IOException {
+        log.info("POST /documents called");
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok(service.createDocument(document), "Document created"));
+                .body(ApiResponse.ok(service.createDocument(document), "Document created", HttpStatus.CREATED.value()));
     }
 
     @GetMapping("/documents")
@@ -45,37 +49,43 @@ public class IRPlatformController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) Integer year) throws IOException {
-        return ResponseEntity.ok(ApiResponse.ok(service.listDocuments(page, size, category, year), "Documents fetched"));
+        log.info("GET /documents called page={} size={} category={} year={}", page, size, category, year);
+        return ResponseEntity.ok(ApiResponse.ok(service.listDocuments(page, size, category, year), "Documents fetched", HttpStatus.OK.value()));
     }
 
     @GetMapping("/documents/{id}")
     public ResponseEntity<ApiResponse<Document>> getDocument(@PathVariable String id) throws IOException {
+        log.info("GET /documents/{} called", id);
         Document doc = service.getDocument(id);
         if (doc == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Document not found"));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Document not found", HttpStatus.NOT_FOUND.value()));
         }
-        return ResponseEntity.ok(ApiResponse.ok(doc, "Document fetched"));
+        return ResponseEntity.ok(ApiResponse.ok(doc, "Document fetched", HttpStatus.OK.value()));
     }
 
     @PutMapping("/documents/{id}")
     public ResponseEntity<ApiResponse<Document>> updateDocument(@PathVariable String id, @RequestBody Document document) throws IOException {
-        return ResponseEntity.ok(ApiResponse.ok(service.updateDocument(id, document), "Document updated"));
+        log.info("PUT /documents/{} called", id);
+        return ResponseEntity.ok(ApiResponse.ok(service.updateDocument(id, document), "Document updated", HttpStatus.OK.value()));
     }
 
     @DeleteMapping("/documents/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteDocument(@PathVariable String id) throws IOException {
+        log.info("DELETE /documents/{} called", id);
         service.deleteDocument(id);
-        return ResponseEntity.ok(ApiResponse.ok(null, "Document deleted"));
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).body(ApiResponse.ok(null, "Document deleted", HttpStatus.NO_CONTENT.value()));
     }
 
     @PostMapping("/index/build")
     public ResponseEntity<ApiResponse<Map<String, Object>>> buildIndex() throws IOException {
-        return ResponseEntity.ok(ApiResponse.ok(service.rebuildIndex(), "Index built"));
+        log.info("POST /index/build called");
+        return ResponseEntity.ok(ApiResponse.ok(service.rebuildIndex(), "Index built", HttpStatus.OK.value()));
     }
 
     @GetMapping("/index/status")
     public ResponseEntity<ApiResponse<Map<String, Object>>> indexStatus() throws IOException {
-        return ResponseEntity.ok(ApiResponse.ok(service.getIndexStatus(), "Index status"));
+        log.info("GET /index/status called");
+        return ResponseEntity.ok(ApiResponse.ok(service.getIndexStatus(), "Index status", HttpStatus.OK.value()));
     }
 
     @GetMapping("/search")
@@ -90,101 +100,118 @@ public class IRPlatformController {
             @RequestParam(defaultValue = "AND") String operator,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) throws IOException {
+        log.info("GET /search called query={} model={} page={} size={}", query, model, page, size);
         Map<String, Object> result = service.search(query, model, stemming, expansion, category, year, keywords, operator, page, size);
-        return ResponseEntity.ok(ApiResponse.ok(result, "Search completed"));
+        return ResponseEntity.ok(ApiResponse.ok(result, "Search completed", HttpStatus.OK.value()));
     }
 
     @PostMapping("/search/expand")
     public ResponseEntity<ApiResponse<Map<String, String>>> expandQuery(@RequestParam String query) throws IOException {
+        log.info("POST /search/expand called query={}", query);
         String expanded = service.expandQuery(query, 5);
-        return ResponseEntity.ok(ApiResponse.ok(Map.of("original", query, "expanded", expanded), "Query expanded"));
+        return ResponseEntity.ok(ApiResponse.ok(Map.of("original", query, "expanded", expanded), "Query expanded", HttpStatus.OK.value()));
     }
 
     @PostMapping("/evaluation/run")
     public ResponseEntity<ApiResponse<EvaluationMetrics>> runEvaluation(@RequestBody EvaluationRunRequest request) {
+        log.info("POST /evaluation/run called");
         EvaluationMetrics metrics = service.runEvaluation(request.getRetrievedDocIds(), request.getRelevantDocIds());
-        return ResponseEntity.ok(ApiResponse.ok(metrics, "Evaluation completed"));
+        return ResponseEntity.ok(ApiResponse.ok(metrics, "Evaluation completed", HttpStatus.OK.value()));
     }
 
     @GetMapping("/evaluation/metrics")
     public ResponseEntity<ApiResponse<EvaluationMetrics>> metrics() {
-        return ResponseEntity.ok(ApiResponse.ok(service.getLastMetrics(), "Current metrics"));
+        log.info("GET /evaluation/metrics called");
+        return ResponseEntity.ok(ApiResponse.ok(service.getLastMetrics(), "Current metrics", HttpStatus.OK.value()));
     }
 
     @GetMapping("/evaluation/pr-curve")
     public ResponseEntity<ApiResponse<List<double[]>>> prCurve() {
-        return ResponseEntity.ok(ApiResponse.ok(service.getLastPrCurve(), "Precision-recall curve"));
+        log.info("GET /evaluation/pr-curve called");
+        return ResponseEntity.ok(ApiResponse.ok(service.getLastPrCurve(), "Precision-recall curve", HttpStatus.OK.value()));
     }
 
     @GetMapping("/analytics/term-distribution")
     public ResponseEntity<ApiResponse<Map<String, Object>>> termDistribution() throws IOException {
-        return ResponseEntity.ok(ApiResponse.ok(service.termDistributionStats(), "Term distribution stats"));
+        log.info("GET /analytics/term-distribution called");
+        return ResponseEntity.ok(ApiResponse.ok(service.termDistributionStats(), "Term distribution stats", HttpStatus.OK.value()));
     }
 
     @GetMapping("/analytics/zipf")
     public ResponseEntity<ApiResponse<Map<String, Object>>> zipf() throws IOException {
-        return ResponseEntity.ok(ApiResponse.ok(service.termDistributionStats(), "Zipf analysis"));
+        log.info("GET /analytics/zipf called");
+        return ResponseEntity.ok(ApiResponse.ok(service.termDistributionStats(), "Zipf analysis", HttpStatus.OK.value()));
     }
 
     @PostMapping("/queries")
     public ResponseEntity<ApiResponse<QueryRecord>> createQuery(@RequestBody QueryRecord query) {
+        log.info("POST /queries called");
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok(service.createQueryRecord(query), "Query created"));
+                .body(ApiResponse.ok(service.createQueryRecord(query), "Query created", HttpStatus.CREATED.value()));
     }
 
     @GetMapping("/queries")
     public ResponseEntity<ApiResponse<List<QueryRecord>>> listQueries() {
-        return ResponseEntity.ok(ApiResponse.ok(service.listQueries(), "Queries fetched"));
+        log.info("GET /queries called");
+        return ResponseEntity.ok(ApiResponse.ok(service.listQueries(), "Queries fetched", HttpStatus.OK.value()));
     }
 
     @GetMapping("/queries/{id}")
     public ResponseEntity<ApiResponse<QueryRecord>> getQuery(@PathVariable String id) {
+        log.info("GET /queries/{} called", id);
         QueryRecord query = service.getQuery(id);
         if (query == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Query not found"));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Query not found", HttpStatus.NOT_FOUND.value()));
         }
-        return ResponseEntity.ok(ApiResponse.ok(query, "Query fetched"));
+        return ResponseEntity.ok(ApiResponse.ok(query, "Query fetched", HttpStatus.OK.value()));
     }
 
     @PutMapping("/queries/{id}")
     public ResponseEntity<ApiResponse<QueryRecord>> updateQuery(@PathVariable String id, @RequestBody QueryRecord query) {
-        return ResponseEntity.ok(ApiResponse.ok(service.updateQuery(id, query), "Query updated"));
+        log.info("PUT /queries/{} called", id);
+        return ResponseEntity.ok(ApiResponse.ok(service.updateQuery(id, query), "Query updated", HttpStatus.OK.value()));
     }
 
     @DeleteMapping("/queries/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteQuery(@PathVariable String id) {
+        log.info("DELETE /queries/{} called", id);
         service.deleteQuery(id);
-        return ResponseEntity.ok(ApiResponse.ok(null, "Query deleted"));
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).body(ApiResponse.ok(null, "Query deleted", HttpStatus.NO_CONTENT.value()));
     }
 
     @PostMapping("/results")
     public ResponseEntity<ApiResponse<ResultRecord>> createResult(@RequestBody ResultRecord result) {
+        log.info("POST /results called");
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok(service.createResultRecord(result), "Result created"));
+                .body(ApiResponse.ok(service.createResultRecord(result), "Result created", HttpStatus.CREATED.value()));
     }
 
     @GetMapping("/results")
     public ResponseEntity<ApiResponse<List<ResultRecord>>> listResults() {
-        return ResponseEntity.ok(ApiResponse.ok(service.listResults(), "Results fetched"));
+        log.info("GET /results called");
+        return ResponseEntity.ok(ApiResponse.ok(service.listResults(), "Results fetched", HttpStatus.OK.value()));
     }
 
     @GetMapping("/results/{id}")
     public ResponseEntity<ApiResponse<ResultRecord>> getResult(@PathVariable String id) {
+        log.info("GET /results/{} called", id);
         ResultRecord result = service.getResult(id);
         if (result == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Result not found"));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Result not found", HttpStatus.NOT_FOUND.value()));
         }
-        return ResponseEntity.ok(ApiResponse.ok(result, "Result fetched"));
+        return ResponseEntity.ok(ApiResponse.ok(result, "Result fetched", HttpStatus.OK.value()));
     }
 
     @PutMapping("/results/{id}")
     public ResponseEntity<ApiResponse<ResultRecord>> updateResult(@PathVariable String id, @RequestBody ResultRecord result) {
-        return ResponseEntity.ok(ApiResponse.ok(service.updateResult(id, result), "Result updated"));
+        log.info("PUT /results/{} called", id);
+        return ResponseEntity.ok(ApiResponse.ok(service.updateResult(id, result), "Result updated", HttpStatus.OK.value()));
     }
 
     @DeleteMapping("/results/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteResult(@PathVariable String id) {
+        log.info("DELETE /results/{} called", id);
         service.deleteResult(id);
-        return ResponseEntity.ok(ApiResponse.ok(null, "Result deleted"));
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).body(ApiResponse.ok(null, "Result deleted", HttpStatus.NO_CONTENT.value()));
     }
 }

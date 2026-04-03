@@ -19,13 +19,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DocumentNotFoundException.class)
     public ResponseEntity<Object> handleDocumentNotFoundException(
             DocumentNotFoundException ex, WebRequest request) {
-        return new ResponseEntity<>(ApiResponse.error(ex.getMessage()), HttpStatus.NOT_FOUND);
+        return new ResponseEntity<>(ApiResponse.error(ex.getMessage(), HttpStatus.NOT_FOUND.value()), HttpStatus.NOT_FOUND);
     }
 
     @ExceptionHandler(IndexException.class)
     public ResponseEntity<Object> handleIndexException(
             IndexException ex, WebRequest request) {
-        return new ResponseEntity<>(ApiResponse.error(ex.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
+        return new ResponseEntity<>(ApiResponse.error(ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR.value()), HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -34,13 +34,14 @@ public class GlobalExceptionHandler {
                 .findFirst()
                 .map(e -> e.getField() + ": " + e.getDefaultMessage())
                 .orElse("Validation failed");
-        return new ResponseEntity<>(ApiResponse.error(message), HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(ApiResponse.error(message, HttpStatus.BAD_REQUEST.value()), HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleGlobalException(
             Exception ex, WebRequest request) {
-        return new ResponseEntity<>(ApiResponse.error("An unexpected error occurred: " + ex.getMessage()),
+        return new ResponseEntity<>(ApiResponse.error("An unexpected error occurred: " + ex.getMessage(),
+                        HttpStatus.INTERNAL_SERVER_ERROR.value()),
                 HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
