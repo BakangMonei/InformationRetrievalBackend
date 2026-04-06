@@ -1,9 +1,11 @@
 # Information Retrieval Platform - Endpoint Explanations
 
 ## Base URL
+
 `http://localhost:8080`
 
 ## Standard API Response
+
 All new platform endpoints return:
 
 ```json
@@ -17,6 +19,7 @@ All new platform endpoints return:
 ## New Platform Endpoints
 
 ### Document Management
+
 - `POST /documents` - Create document
 - `GET /documents?page=0&size=10&category=academic&year=2025` - List documents with pagination and metadata filters
 - `GET /documents/{id}` - Get one document
@@ -24,6 +27,7 @@ All new platform endpoints return:
 - `DELETE /documents/{id}` - Delete document
 
 ### Query and Result CRUD
+
 - `POST /queries`
 - `GET /queries`
 - `GET /queries/{id}`
@@ -37,10 +41,12 @@ All new platform endpoints return:
 - `DELETE /results/{id}`
 
 ### Indexing
+
 - `POST /index/build` - Build/rebuild index and track timing/token stats
 - `GET /index/status` - Index metadata (size, docs, deleted docs, timing, tokens)
 
 ### Search and Retrieval
+
 - `GET /search` with:
   - `query` (required)
   - `model=tf|tfidf|normalized|bm25`
@@ -51,10 +57,12 @@ All new platform endpoints return:
   - `page`, `size`
 
 ### Query Expansion
+
 - `POST /search/expand?query=...`
 - Uses pseudo-relevance feedback style expansion from top-ranked terms.
 
 ### Evaluation APIs
+
 - `POST /evaluation/run`
   - Body:
   ```json
@@ -67,6 +75,7 @@ All new platform endpoints return:
 - `GET /evaluation/pr-curve` - Returns PR points
 
 ### Analytics (Distinction Features)
+
 - `GET /analytics/term-distribution` - Vocabulary size and top term frequencies
 - `GET /analytics/zipf` - Zipf-style slope approximation and term rank data
 
@@ -100,5 +109,6 @@ curl -X POST http://localhost:8080/evaluation/run \
 ```
 
 ## Backward Compatibility Note
+
 Legacy endpoints under `/api/*` are still present in the codebase.
 The endpoints listed above are the new modular IR platform surface.

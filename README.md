@@ -39,6 +39,7 @@ New modular platform endpoints are exposed from root paths.
 ## New Endpoint Coverage
 
 ### Document CRUD
+
 - `POST /documents`
 - `GET /documents`
 - `GET /documents/{id}`
@@ -46,6 +47,7 @@ New modular platform endpoints are exposed from root paths.
 - `DELETE /documents/{id}`
 
 ### Query CRUD
+
 - `POST /queries`
 - `GET /queries`
 - `GET /queries/{id}`
@@ -53,6 +55,7 @@ New modular platform endpoints are exposed from root paths.
 - `DELETE /queries/{id}`
 
 ### Result CRUD
+
 - `POST /results`
 - `GET /results`
 - `GET /results/{id}`
@@ -60,10 +63,12 @@ New modular platform endpoints are exposed from root paths.
 - `DELETE /results/{id}`
 
 ### Indexing
+
 - `POST /index/build`
 - `GET /index/status`
 
 ### Search and Retrieval
+
 - `GET /search`
   - Required: `query`
   - Optional:
@@ -75,30 +80,36 @@ New modular platform endpoints are exposed from root paths.
     - `page`, `size`
 
 ### Query Expansion
+
 - `POST /search/expand?query=...`
 
 ### Evaluation
+
 - `POST /evaluation/run`
 - `GET /evaluation/metrics`
 - `GET /evaluation/pr-curve`
 
 ### Analytics
+
 - `GET /analytics/term-distribution`
 - `GET /analytics/zipf`
 
 ## Quick Start
 
 ### Run
+
 ```bash
 ./mvnw spring-boot:run
 ```
 
 ### Build
+
 ```bash
 ./mvnw clean package
 ```
 
 ### OpenAPI / Swagger UI
+
 - [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
 
 ## Example Requests

@@ -6,6 +6,7 @@ Refactor and upgrade my existing React.js frontend into a production-grade Infor
 ## Mission
 
 Build a scalable, modular, high-performance frontend that supports:
+
 - Full CRUD for Documents, Queries, and Results
 - Advanced search and retrieval workflows
 - Evaluation and analytics visualization
@@ -20,6 +21,7 @@ Do not do a shallow rewrite. Preserve what works, improve structure and quality.
 Base URL: `http://localhost:8080`
 
 ### Documents
+
 - `POST /documents`
 - `GET /documents?page=&size=&category=&year=`
 - `GET /documents/{id}`
@@ -27,6 +29,7 @@ Base URL: `http://localhost:8080`
 - `DELETE /documents/{id}`
 
 ### Queries
+
 - `POST /queries`
 - `GET /queries`
 - `GET /queries/{id}`
@@ -34,6 +37,7 @@ Base URL: `http://localhost:8080`
 - `DELETE /queries/{id}`
 
 ### Results
+
 - `POST /results`
 - `GET /results`
 - `GET /results/{id}`
@@ -41,24 +45,30 @@ Base URL: `http://localhost:8080`
 - `DELETE /results/{id}`
 
 ### Indexing
+
 - `POST /index/build`
 - `GET /index/status`
 
 ### Search
+
 - `GET /search?query=&model=tf|tfidf|normalized|bm25&stemming=true|false&expansion=true|false&category=&year=&keywords=&operator=AND|OR&page=&size=`
 - `POST /search/expand?query=...`
 
 ### Evaluation
+
 - `POST /evaluation/run`
 - `GET /evaluation/metrics`
 - `GET /evaluation/pr-curve`
 
 ### Analytics
+
 - `GET /analytics/term-distribution`
 - `GET /analytics/zipf`
 
 ### Response format
+
 All APIs return:
+
 ```json
 {
   "success": true,
@@ -75,12 +85,14 @@ All APIs return:
 ### 1) Frontend Architecture
 
 Implement or refactor into:
+
 - `src/app` (app shell, providers, router)
 - `src/features/*` (document, query, result, search, evaluation, analytics, indexing)
 - `src/shared/*` (ui components, hooks, api client, utils, constants, types)
 - `src/pages/*` (route-level pages)
 
 Use:
+
 - React 18+
 - React Router
 - Axios or Fetch wrapper with interceptors
@@ -90,6 +102,7 @@ Use:
 ### 2) UI/UX Requirements
 
 Design a professional dashboard with:
+
 - Left navigation: Documents, Search, Queries, Results, Indexing, Evaluation, Analytics, Settings
 - Top bar: global search, system status
 - Responsive layouts for desktop + tablet
@@ -101,12 +114,14 @@ Design a professional dashboard with:
 ### 3) Feature Implementation
 
 #### Documents
+
 - Data table with pagination, filter by category/year
 - Create/Edit modal form with validation
 - View details panel
 - Delete action with confirm modal
 
 #### Search
+
 - Advanced search form:
   - query text
   - model dropdown (tf/tfidf/normalized/bm25)
@@ -120,21 +135,25 @@ Design a professional dashboard with:
 - Query expansion trigger and display original vs expanded query
 
 #### Indexing
+
 - "Build/Rebuild Index" action
 - Index status widget (size, docs, deleted docs, indexing time, token stats)
 - Real-time feedback while action is running
 
 #### Evaluation
+
 - Input relevant and retrieved doc IDs
 - Run evaluation button
 - Display Precision, Recall, F1, MAP cards
 - PR curve chart (line chart)
 
 #### Analytics
+
 - Term distribution table/chart
 - Zipf analysis visualization (rank vs frequency trend)
 
 ### 4) Performance Requirements
+
 - Use memoization where needed
 - Use debounced inputs for search/filter text fields
 - Prevent unnecessary rerenders
@@ -142,6 +161,7 @@ Design a professional dashboard with:
 - Paginate large lists and avoid rendering huge arrays at once
 
 ### 5) API Layer Standards
+
 - Create a single API client module
 - Centralize endpoint constants
 - Handle `success=false` and `statusCode` gracefully
@@ -149,6 +169,7 @@ Design a professional dashboard with:
 - Add request/response logging in development mode
 
 ### 6) Code Quality
+
 - Keep components small and focused
 - Prefer reusable UI primitives
 - Enforce linting and formatting
@@ -156,6 +177,7 @@ Design a professional dashboard with:
 - Add integration tests for major user flows
 
 ### 7) Security and Reliability
+
 - Sanitize and validate form input on client side
 - Prevent unsafe HTML rendering
 - Guard against undefined/null API states
