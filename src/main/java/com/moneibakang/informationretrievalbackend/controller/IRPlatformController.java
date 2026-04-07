@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
@@ -92,6 +93,7 @@ public class IRPlatformController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> search(
             @RequestParam String query,
             @RequestParam(defaultValue = "bm25") String model,
+            @RequestParam(defaultValue = "standard") String tokenizer,
             @RequestParam(defaultValue = "false") boolean stemming,
             @RequestParam(defaultValue = "false") boolean expansion,
             @RequestParam(required = false) String category,
@@ -100,8 +102,8 @@ public class IRPlatformController {
             @RequestParam(defaultValue = "AND") String operator,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) throws IOException {
-        log.info("GET /search called query={} model={} page={} size={}", query, model, page, size);
-        Map<String, Object> result = service.search(query, model, stemming, expansion, category, year, keywords, operator, page, size);
+        log.info("GET /search called query={} model={} tokenizer={} page={} size={}", query, model, tokenizer, page, size);
+        Map<String, Object> result = service.search(query, model, tokenizer, stemming, expansion, category, year, keywords, operator, page, size);
         return ResponseEntity.ok(ApiResponse.ok(result, "Search completed", HttpStatus.OK.value()));
     }
 
@@ -213,5 +215,52 @@ public class IRPlatformController {
         log.info("DELETE /results/{} called", id);
         service.deleteResult(id);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).body(ApiResponse.ok(null, "Result deleted", HttpStatus.NO_CONTENT.value()));
+    }
+
+    @PostMapping("/experiments/variant/build")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> buildVariant(@RequestParam(defaultValue = "CISI") String dataset,
+                                                                         @RequestParam(defaultValue = "standard") String tokenizer,
+                                                                         @RequestParam(defaultValue = "false") boolean stemming) throws IOException {
+        return ResponseEntity.ok(ApiResponse.ok(service.buildIndexVariant(dataset, tokenizer, stemming), "Variant index built", HttpStatus.OK.value()));
+    }
+
+    @GetMapping("/experiments/variant/search")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> searchVariant(@RequestParam String query,
+                                                                          @RequestParam(defaultValue = "CISI") String dataset,
+                                                                          @RequestParam(defaultValue = "standard") String tokenizer,
+                                                                          @RequestParam(defaultValue = "false") boolean stemming,
+                                                                          @RequestParam(defaultValue = "bm25") String model,
+                                                                          @RequestParam(defaultValue = "0") int page,
+                                                                          @RequestParam(defaultValue = "10") int size) throws IOException {
+        return ResponseEntity.ok(ApiResponse.ok(service.searchVariant(query, dataset, tokenizer, stemming, model, page, size), "Variant search complete", HttpStatus.OK.value()));
+    }
+
+    @PostMapping("/experiments/run")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> runExperiment() throws IOException {
+        return ResponseEntity.ok(ApiResponse.ok(service.runCisiExperiment(), "Experiment run complete", HttpStatus.OK.value()));
+    }
+
+    @GetMapping("/evaluation/dataset")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> evaluateDataset(@RequestParam String dataset,
+                                                                            @RequestParam(required = false) String queryFilePath,
+                                                                            @RequestParam(required = false) String relevanceFilePath) throws IOException {
+        return ResponseEntity.ok(ApiResponse.ok(service.runDatasetEvaluation(dataset, queryFilePath, relevanceFilePath), "Dataset evaluation complete", HttpStatus.OK.value()));
+    }
+
+    @PostMapping("/workflow/upload")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> uploadForWorkflow(@RequestParam("file") MultipartFile file,
+                                                                               @RequestParam(required = false) String dataset) throws IOException {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok(service.markUpload(file, dataset), "Upload completed", HttpStatus.CREATED.value()));
+    }
+
+    @GetMapping("/workflow/status")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> workflowStatus() {
+        return ResponseEntity.ok(ApiResponse.ok(service.workflowStatus(), "Workflow status", HttpStatus.OK.value()));
+    }
+
+    @PostMapping("/workflow/reset")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> workflowReset() {
+        return ResponseEntity.ok(ApiResponse.ok(service.resetWorkflow(), "Workflow reset", HttpStatus.OK.value()));
     }
 }

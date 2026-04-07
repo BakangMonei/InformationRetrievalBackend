@@ -5,7 +5,14 @@ import com.moneibakang.informationretrievalbackend.model.EvaluationMetrics;
 import com.moneibakang.informationretrievalbackend.model.QueryRecord;
 import com.moneibakang.informationretrievalbackend.model.ResultRecord;
 import com.moneibakang.informationretrievalbackend.repository.LuceneDocumentRepository;
+import com.moneibakang.informationretrievalbackend.util.AnalyzerFactory;
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.BooleanClause;
@@ -17,13 +24,19 @@ import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.similarities.BM25Similarity;
 import org.apache.lucene.search.similarities.ClassicSimilarity;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -41,6 +54,7 @@ import java.util.stream.Collectors;
 public class IRPlatformService {
     private static final Logger log = LoggerFactory.getLogger(IRPlatformService.class);
     private final LuceneDocumentRepository repository;
+    private final AnalyzerFactory analyzerFactory;
 
     private volatile long lastIndexingTimeMs = 0;
     private volatile long lastIndexedTokens = 0;
@@ -49,9 +63,13 @@ public class IRPlatformService {
     private final Map<String, ResultRecord> resultStore = new ConcurrentHashMap<>();
     private volatile EvaluationMetrics lastMetrics = new EvaluationMetrics();
     private volatile List<double[]> lastPrCurve = new ArrayList<>();
+    private final Map<String, Path> variantIndexPaths = new ConcurrentHashMap<>();
+    private final Map<String, Object> workflowState = new ConcurrentHashMap<>();
 
-    public IRPlatformService(LuceneDocumentRepository repository) {
+    public IRPlatformService(LuceneDocumentRepository repository, AnalyzerFactory analyzerFactory) {
         this.repository = repository;
+        this.analyzerFactory = analyzerFactory;
+        resetWorkflow();
     }
 
     public Document createDocument(Document document) throws IOException {
@@ -91,6 +109,8 @@ public class IRPlatformService {
         repository.saveAll(all);
         lastIndexedTokens = all.stream().mapToLong(this::tokenCount).sum();
         lastIndexingTimeMs = System.currentTimeMillis() - start;
+        workflowState.put("indexBuilt", true);
+        workflowState.put("stage", "INDEXED");
         return getIndexStatus();
     }
 
@@ -105,6 +125,7 @@ public class IRPlatformService {
 
     public Map<String, Object> search(String query,
                                       String model,
+                                      String tokenizer,
                                       boolean stemming,
                                       boolean expansion,
                                       String category,
@@ -119,7 +140,7 @@ public class IRPlatformService {
         try (DirectoryReader reader = DirectoryReader.open(repository.getDirectory())) {
             IndexSearcher searcher = new IndexSearcher(reader);
             setSimilarity(searcher, model);
-            Query luceneQuery = buildQuery(queryText, category, year, keywords, operator, stemming);
+            Query luceneQuery = buildQuery(queryText, category, year, keywords, operator, tokenizer, stemming);
             TopDocs topDocs = searcher.search(luceneQuery, Math.max(100, (page + 1) * size));
 
             int from = Math.min(page * size, topDocs.scoreDocs.length);
@@ -160,6 +181,8 @@ public class IRPlatformService {
             resultStore.put(rr.getId(), rr);
 
             log.info("search query='{}' model={} hits={} latencyMs={}", queryText, model, topDocs.totalHits.value, latency);
+            workflowState.put("searched", true);
+            workflowState.put("stage", "SEARCHED");
 
             Map<String, Object> out = new HashMap<>();
             out.put("queryId", queryId);
@@ -175,7 +198,7 @@ public class IRPlatformService {
     }
 
     public String expandQuery(String query, int topTerms) throws IOException {
-        Map<String, Object> initial = search(query, "bm25", false, false, null, null, null, "AND", 0, 5);
+        Map<String, Object> initial = search(query, "bm25", "standard", false, false, null, null, null, "AND", 0, 5);
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> results = (List<Map<String, Object>>) initial.get("results");
         Map<String, Integer> tf = new HashMap<>();
@@ -317,9 +340,10 @@ public class IRPlatformService {
         return out;
     }
 
-    private Query buildQuery(String text, String category, Integer year, String keywords, String operator, boolean stemming) throws Exception {
+    private Query buildQuery(String text, String category, Integer year, String keywords, String operator, String tokenizer, boolean stemming) throws Exception {
         BooleanQuery.Builder builder = new BooleanQuery.Builder();
-        QueryParser parser = new QueryParser("content", new org.apache.lucene.analysis.standard.StandardAnalyzer());
+        Analyzer analyzer = analyzerFactory.getAnalyzer(tokenizer, stemming);
+        QueryParser parser = new QueryParser("content", analyzer);
         builder.add(parser.parse(QueryParser.escape(text)), BooleanClause.Occur.MUST);
 
         if (category != null && !category.isBlank()) {
@@ -421,5 +445,248 @@ public class IRPlatformService {
         double x2 = Math.log(rankedTerms.size());
         double y2 = Math.log(Math.max(1, rankedTerms.get(rankedTerms.size() - 1).getValue()));
         return (y2 - y1) / (x2 - x1);
+    }
+
+    public Map<String, Object> buildIndexVariant(String dataset, String tokenizer, boolean stemming) throws IOException {
+        String key = variantKey(dataset, tokenizer, stemming);
+        Path variantPath = Paths.get("index_variants", key);
+        Files.createDirectories(variantPath);
+        variantIndexPaths.put(key, variantPath);
+        List<Document> docs = repository.findAll().stream()
+                .filter(d -> dataset == null || dataset.isBlank() || dataset.equalsIgnoreCase(d.getCollection()) || dataset.equalsIgnoreCase(d.getDataset()))
+                .toList();
+        try (Directory dir = FSDirectory.open(variantPath)) {
+            try (Analyzer analyzer = analyzerFactory.getAnalyzer(tokenizer, stemming)) {
+                IndexWriterConfig cfg = new IndexWriterConfig(analyzer);
+                cfg.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
+                try (IndexWriter writer = new IndexWriter(dir, cfg)) {
+                    for (Document d : docs) {
+                        org.apache.lucene.document.Document ld = new org.apache.lucene.document.Document();
+                        ld.add(new StringField("id", d.getId(), Field.Store.YES));
+                        ld.add(new TextField("title", safe(d.getTitle()), Field.Store.YES));
+                        ld.add(new TextField("content", safe(d.getContent()), Field.Store.YES));
+                        ld.add(new StringField("author", safe(d.getAuthor()), Field.Store.YES));
+                        ld.add(new StringField("dataset", safe(d.getDataset()), Field.Store.YES));
+                        ld.add(new StringField("collection", safe(d.getCollection()), Field.Store.YES));
+                        int year = toYear(d.getTimestamp());
+                        ld.add(new StringField("year", String.valueOf(year), Field.Store.YES));
+                        writer.addDocument(ld);
+                    }
+                }
+            }
+        }
+        Map<String, Object> response = new HashMap<>();
+        response.put("variant", key);
+        response.put("path", variantPath.toString());
+        response.put("documentCount", docs.size());
+        response.put("tokenizer", tokenizer);
+        response.put("stemming", stemming);
+        response.put("dataset", dataset);
+        workflowState.put("indexBuilt", true);
+        workflowState.put("stage", "INDEXED");
+        return response;
+    }
+
+    public Map<String, Object> searchVariant(String query, String dataset, String tokenizer, boolean stemming, String model, int page, int size) throws IOException {
+        String key = variantKey(dataset, tokenizer, stemming);
+        Path path = variantIndexPaths.getOrDefault(key, Paths.get("index_variants", key));
+        if (!Files.exists(path)) {
+            buildIndexVariant(dataset, tokenizer, stemming);
+        }
+        try (Directory dir = FSDirectory.open(path); DirectoryReader reader = DirectoryReader.open(dir)) {
+            IndexSearcher searcher = new IndexSearcher(reader);
+            setSimilarity(searcher, model);
+            QueryParser parser = new QueryParser("content", analyzerFactory.getAnalyzer(tokenizer, stemming));
+            Query q = parser.parse(QueryParser.escape(query));
+            TopDocs topDocs = searcher.search(q, Math.max(100, (page + 1) * size));
+            int from = Math.min(page * size, topDocs.scoreDocs.length);
+            int to = Math.min(from + size, topDocs.scoreDocs.length);
+            List<String> ids = new ArrayList<>();
+            for (int i = from; i < to; i++) {
+                org.apache.lucene.document.Document doc = searcher.storedFields().document(topDocs.scoreDocs[i].doc);
+                ids.add(doc.get("id"));
+            }
+            Map<String, Object> out = new HashMap<>();
+            out.put("variant", key);
+            out.put("retrievedDocIds", ids);
+            out.put("totalHits", topDocs.totalHits.value);
+            workflowState.put("searched", true);
+            workflowState.put("stage", "SEARCHED");
+            return out;
+        } catch (Exception e) {
+            throw new IOException("Variant search failed: " + e.getMessage(), e);
+        }
+    }
+
+    public Map<String, Object> runCisiExperiment() throws IOException {
+        Map<String, String> queries = parseCisiQueries("src/main/resources/CISI.QRY");
+        Map<String, Set<String>> relevance = parseCisiRelevance("src/main/resources/CISI.REL");
+        List<String> tokenizers = List.of("standard", "simple");
+        List<Boolean> stemOptions = List.of(Boolean.FALSE, Boolean.TRUE);
+        List<String> models = List.of("tf", "tfidf", "normalized");
+        List<Map<String, Object>> results = new ArrayList<>();
+
+        for (String tokenizer : tokenizers) {
+            for (Boolean stemming : stemOptions) {
+                buildIndexVariant("CISI", tokenizer, stemming);
+                for (String model : models) {
+                    double p = 0;
+                    double r = 0;
+                    double f1 = 0;
+                    double map = 0;
+                    int count = 0;
+                    for (Map.Entry<String, String> q : queries.entrySet()) {
+                        Map<String, Object> search = searchVariant(q.getValue(), "CISI", tokenizer, stemming, model, 0, 20);
+                        @SuppressWarnings("unchecked")
+                        List<String> retrieved = (List<String>) search.get("retrievedDocIds");
+                        List<String> rel = new ArrayList<>(relevance.getOrDefault(q.getKey(), Set.of()));
+                        EvaluationMetrics m = runEvaluation(retrieved, rel);
+                        p += m.getPrecision();
+                        r += m.getRecall();
+                        f1 += m.getF1Score();
+                        map += m.getMap();
+                        count++;
+                    }
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("dataset", "CISI");
+                    row.put("tokenizer", tokenizer);
+                    row.put("stemming", stemming);
+                    row.put("model", model);
+                    row.put("precision", count == 0 ? 0 : p / count);
+                    row.put("recall", count == 0 ? 0 : r / count);
+                    row.put("f1", count == 0 ? 0 : f1 / count);
+                    row.put("map", count == 0 ? 0 : map / count);
+                    results.add(row);
+                }
+            }
+        }
+        results.sort(Comparator.comparingDouble(r -> -((Number) r.get("map")).doubleValue()));
+        workflowState.put("evaluated", true);
+        workflowState.put("stage", "EVALUATED");
+        return Map.of("dataset", "CISI", "comparisons", results, "best", results.isEmpty() ? Map.of() : results.get(0));
+    }
+
+    public Map<String, Object> runDatasetEvaluation(String dataset, String queryFilePath, String relevanceFilePath) throws IOException {
+        if (!"CISI".equalsIgnoreCase(dataset) && (queryFilePath == null || relevanceFilePath == null)) {
+            return Map.of("dataset", dataset, "message", "No default ground-truth available for this dataset. Provide queryFilePath and relevanceFilePath.");
+        }
+        Map<String, String> queries = parseCisiQueries(queryFilePath == null ? "src/main/resources/CISI.QRY" : queryFilePath);
+        Map<String, Set<String>> relevance = parseCisiRelevance(relevanceFilePath == null ? "src/main/resources/CISI.REL" : relevanceFilePath);
+        double p = 0;
+        double r = 0;
+        double f1 = 0;
+        double map = 0;
+        int n = 0;
+        buildIndexVariant(dataset, "standard", false);
+        for (Map.Entry<String, String> q : queries.entrySet()) {
+            Map<String, Object> search = searchVariant(q.getValue(), dataset, "standard", false, "bm25", 0, 20);
+            @SuppressWarnings("unchecked")
+            List<String> retrieved = (List<String>) search.get("retrievedDocIds");
+            List<String> rel = new ArrayList<>(relevance.getOrDefault(q.getKey(), Set.of()));
+            EvaluationMetrics m = runEvaluation(retrieved, rel);
+            p += m.getPrecision();
+            r += m.getRecall();
+            f1 += m.getF1Score();
+            map += m.getMap();
+            n++;
+        }
+        workflowState.put("evaluated", true);
+        workflowState.put("stage", "EVALUATED");
+        return Map.of(
+                "dataset", dataset,
+                "queriesEvaluated", n,
+                "precision", n == 0 ? 0 : p / n,
+                "recall", n == 0 ? 0 : r / n,
+                "f1", n == 0 ? 0 : f1 / n,
+                "map", n == 0 ? 0 : map / n
+        );
+    }
+
+    public Map<String, Object> workflowStatus() {
+        return new HashMap<>(workflowState);
+    }
+
+    public Map<String, Object> resetWorkflow() {
+        workflowState.put("uploaded", false);
+        workflowState.put("indexBuilt", false);
+        workflowState.put("searched", false);
+        workflowState.put("evaluated", false);
+        workflowState.put("stage", "EMPTY");
+        return workflowStatus();
+    }
+
+    public Map<String, Object> markUpload(MultipartFile file, String dataset) throws IOException {
+        if (file == null || file.isEmpty()) {
+            throw new IOException("No file provided");
+        }
+        String name = file.getOriginalFilename() == null ? "upload.dat" : file.getOriginalFilename();
+        Path uploadDir = Paths.get("uploaded-files");
+        Files.createDirectories(uploadDir);
+        Path target = uploadDir.resolve(name);
+        file.transferTo(target);
+        workflowState.put("uploaded", true);
+        workflowState.put("stage", "UPLOADED");
+        workflowState.put("dataset", dataset == null ? "UPLOADED" : dataset);
+        return Map.of("uploaded", true, "path", target.toString(), "dataset", workflowState.get("dataset"));
+    }
+
+    private String variantKey(String dataset, String tokenizer, boolean stemming) {
+        String ds = (dataset == null || dataset.isBlank()) ? "ALL" : dataset.toUpperCase(Locale.ROOT);
+        return ds + "_" + tokenizer.toLowerCase(Locale.ROOT) + "_" + (stemming ? "stemmed" : "unstemmed");
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value;
+    }
+
+    private Map<String, String> parseCisiQueries(String path) throws IOException {
+        Map<String, String> out = new HashMap<>();
+        try (BufferedReader br = Files.newBufferedReader(Paths.get(path))) {
+            String line;
+            String currentId = null;
+            boolean inW = false;
+            StringBuilder text = new StringBuilder();
+            while ((line = br.readLine()) != null) {
+                if (line.startsWith(".I")) {
+                    if (currentId != null && text.length() > 0) {
+                        out.put(currentId, text.toString().trim());
+                    }
+                    currentId = line.substring(2).trim();
+                    text = new StringBuilder();
+                    inW = false;
+                    continue;
+                }
+                if (line.startsWith(".W")) {
+                    inW = true;
+                    continue;
+                }
+                if (line.startsWith(".")) {
+                    inW = false;
+                }
+                if (inW) {
+                    text.append(line).append(' ');
+                }
+            }
+            if (currentId != null && text.length() > 0) {
+                out.put(currentId, text.toString().trim());
+            }
+        }
+        return out;
+    }
+
+    private Map<String, Set<String>> parseCisiRelevance(String path) throws IOException {
+        Map<String, Set<String>> out = new HashMap<>();
+        try (BufferedReader br = Files.newBufferedReader(Paths.get(path))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] parts = line.trim().split("\\s+");
+                if (parts.length >= 2) {
+                    String qid = parts[0];
+                    String docId = "CISI-" + parts[1];
+                    out.computeIfAbsent(qid, k -> new HashSet<>()).add(docId);
+                }
+            }
+        }
+        return out;
     }
 }
