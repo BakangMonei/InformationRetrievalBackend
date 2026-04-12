@@ -1,0 +1,1088 @@
+{
+  "info": {
+    "_postman_id": "78caffcd-565d-4c66-80b2-6ff46e32b2c2",
+    "name": "Information Retrieval Backend",
+    "description": "Generated from Endpoints.md. Import in Postman: File \u2192 Import. Set collection variables (baseUrl, IDs) as needed.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "documentId",
+      "value": "REPLACE_WITH_DOCUMENT_ID"
+    },
+    {
+      "key": "queryId",
+      "value": "REPLACE_WITH_QUERY_ID"
+    },
+    {
+      "key": "resultId",
+      "value": "REPLACE_WITH_RESULT_ID"
+    }
+  ],
+  "item": [
+    {
+      "name": "1 - Document Management",
+      "item": [
+        {
+          "name": "Create document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Sample title\",\n  \"content\": \"Sample document body for IR testing.\",\n  \"author\": \"Tester\"\n}"
+            },
+            "url": "{{baseUrl}}/documents"
+          }
+        },
+        {
+          "name": "List documents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/documents?page=0&size=10"
+          }
+        },
+        {
+          "name": "Get document by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/documents/{{documentId}}"
+          }
+        },
+        {
+          "name": "Update document",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated title\",\n  \"content\": \"Updated content.\"\n}"
+            },
+            "url": "{{baseUrl}}/documents/{{documentId}}"
+          }
+        },
+        {
+          "name": "Delete document",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/documents/{{documentId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 - Query CRUD",
+      "item": [
+        {
+          "name": "Create query",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"queryText\": \"information retrieval\",\n  \"model\": \"bm25\",\n  \"latencyMs\": 12\n}"
+            },
+            "url": "{{baseUrl}}/queries"
+          }
+        },
+        {
+          "name": "List queries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/queries"
+          }
+        },
+        {
+          "name": "Get query by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/queries/{{queryId}}"
+          }
+        },
+        {
+          "name": "Update query",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"queryText\": \"updated query\",\n  \"model\": \"tfidf\"\n}"
+            },
+            "url": "{{baseUrl}}/queries/{{queryId}}"
+          }
+        },
+        {
+          "name": "Delete query",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/queries/{{queryId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 - Result CRUD",
+      "item": [
+        {
+          "name": "Create result",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"queryId\": \"{{queryId}}\",\n  \"documentIds\": [\n    \"doc-1\",\n    \"doc-2\"\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/results"
+          }
+        },
+        {
+          "name": "List results",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/results"
+          }
+        },
+        {
+          "name": "Get result by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/results/{{resultId}}"
+          }
+        },
+        {
+          "name": "Update result",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"queryId\": \"{{queryId}}\",\n  \"documentIds\": [\n    \"doc-3\"\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/results/{{resultId}}"
+          }
+        },
+        {
+          "name": "Delete result",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/results/{{resultId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 - Indexing",
+      "item": [
+        {
+          "name": "Build index",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/index/build"
+          }
+        },
+        {
+          "name": "Index status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/index/status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 - Search and Retrieval",
+      "item": [
+        {
+          "name": "Search",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/search?query=information+retrieval&model=bm25&tokenizer=standard&stemming=false&expansion=false&operator=AND&page=0&size=10",
+            "description": "Optional: category, year, keywords. model: tf|tfidf|normalized|bm25"
+          }
+        },
+        {
+          "name": "Query expansion",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/search/expand?query=neural+networks",
+            "description": "POST with query param (not JSON body)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 - Evaluation",
+      "item": [
+        {
+          "name": "Run evaluation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"retrievedDocIds\": [\n    \"d1\",\n    \"d2\"\n  ],\n  \"relevantDocIds\": [\n    \"d2\",\n    \"d9\"\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/evaluation/run"
+          }
+        },
+        {
+          "name": "Latest metrics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/evaluation/metrics"
+          }
+        },
+        {
+          "name": "PR curve",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/evaluation/pr-curve"
+          }
+        },
+        {
+          "name": "Dataset evaluation",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/evaluation/dataset?dataset=CISI",
+            "description": "Optional: queryFilePath, relevanceFilePath"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7 - Analytics",
+      "item": [
+        {
+          "name": "Term distribution",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/analytics/term-distribution"
+          }
+        },
+        {
+          "name": "Zipf",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/analytics/zipf"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8 - Experiments",
+      "item": [
+        {
+          "name": "Build variant index",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/experiments/variant/build?dataset=CISI&tokenizer=standard&stemming=false"
+          }
+        },
+        {
+          "name": "Search variant",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/experiments/variant/search?query=test+query&dataset=CISI&tokenizer=standard&stemming=false&model=bm25&page=0&size=10"
+          }
+        },
+        {
+          "name": "Run experiment suite",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/experiments/run"
+          }
+        }
+      ]
+    },
+    {
+      "name": "9 - Guided workflow",
+      "item": [
+        {
+          "name": "Upload (multipart)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "dataset",
+                  "type": "text",
+                  "value": "CISI"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/workflow/upload",
+            "description": "Select a file for 'file' in the Body tab after import."
+          }
+        },
+        {
+          "name": "Workflow status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/workflow/status"
+          }
+        },
+        {
+          "name": "Reset workflow",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/workflow/reset"
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 - Legacy /api/documents",
+      "item": [
+        {
+          "name": "Legacy create document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Legacy doc\",\n  \"content\": \"Content\",\n  \"author\": \"A\",\n  \"collection\": \"default\"\n}"
+            },
+            "url": "{{baseUrl}}/api/documents"
+          }
+        },
+        {
+          "name": "Legacy list documents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/documents"
+          }
+        },
+        {
+          "name": "Legacy get document",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/documents/{{documentId}}"
+          }
+        },
+        {
+          "name": "Legacy update document",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"T\",\n  \"content\": \"C\"\n}"
+            },
+            "url": "{{baseUrl}}/api/documents/{{documentId}}"
+          }
+        },
+        {
+          "name": "Legacy delete document",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/documents/{{documentId}}"
+          }
+        },
+        {
+          "name": "Legacy search (GET)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/documents/search?q=information"
+          }
+        },
+        {
+          "name": "Legacy search (POST JSON)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"information retrieval\",\n  \"rankingAlgorithm\": \"tf-idf\",\n  \"tokenizerType\": \"standard\",\n  \"useStemming\": false,\n  \"applyLengthNormalization\": true,\n  \"resultsPerPage\": 10,\n  \"page\": 0\n}"
+            },
+            "url": "{{baseUrl}}/api/documents/search"
+          }
+        },
+        {
+          "name": "Legacy bulk import",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "tokenizerType",
+                  "type": "text",
+                  "value": "standard"
+                },
+                {
+                  "key": "useStemming",
+                  "type": "text",
+                  "value": "false"
+                },
+                {
+                  "key": "rankingAlgorithm",
+                  "type": "text",
+                  "value": "tf-idf"
+                },
+                {
+                  "key": "lengthNormalization",
+                  "type": "text",
+                  "value": "true"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/documents/bulk"
+          }
+        },
+        {
+          "name": "Legacy upload file",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/documents/upload"
+          }
+        }
+      ]
+    },
+    {
+      "name": "10b - Legacy /api/index",
+      "item": [
+        {
+          "name": "Recreate index",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/index/recreate"
+          }
+        },
+        {
+          "name": "Index stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/index/stats"
+          }
+        },
+        {
+          "name": "Import CISI",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/index/import/cisi",
+            "description": "Omit filePath query to use default CISI.ALL path."
+          }
+        },
+        {
+          "name": "Import PubMed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/index/import/pubmed"
+          }
+        },
+        {
+          "name": "GET tokenizer config",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/index/config/tokenizer"
+          }
+        },
+        {
+          "name": "PUT tokenizer config",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"standard\"\n}"
+            },
+            "url": "{{baseUrl}}/api/index/config/tokenizer"
+          }
+        },
+        {
+          "name": "GET stemming config",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/index/config/stemming"
+          }
+        },
+        {
+          "name": "PUT stemming config",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enabled\": false\n}"
+            },
+            "url": "{{baseUrl}}/api/index/config/stemming"
+          }
+        },
+        {
+          "name": "GET ranking config",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/index/config/ranking"
+          }
+        },
+        {
+          "name": "PUT ranking config",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"algorithm\": \"tf-idf\"\n}"
+            },
+            "url": "{{baseUrl}}/api/index/config/ranking"
+          }
+        },
+        {
+          "name": "GET normalization config",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/index/config/normalization"
+          }
+        },
+        {
+          "name": "PUT normalization config",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enabled\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/index/config/normalization"
+          }
+        },
+        {
+          "name": "Index metrics (no params)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/index/metrics",
+            "description": "Add queryId and relevanceFile query params for full metrics response."
+          }
+        },
+        {
+          "name": "Index metrics (with params)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/index/metrics?queryId=1&relevanceFile=src%2Fmain%2Fresources%2FCISI.REL"
+          }
+        },
+        {
+          "name": "Index health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/index/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "10c - Legacy /api/ir",
+      "item": [
+        {
+          "name": "IR index documents",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"title\": \"T1\",\n    \"content\": \"hello world\",\n    \"author\": \"A\"\n  }\n]"
+            },
+            "url": "{{baseUrl}}/api/ir/index"
+          }
+        },
+        {
+          "name": "IR search",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"hello\",\n  \"rankingAlgorithm\": \"tf-idf\",\n  \"tokenizerType\": \"standard\",\n  \"useStemming\": false,\n  \"applyLengthNormalization\": true,\n  \"resultsPerPage\": 10,\n  \"page\": 0\n}"
+            },
+            "url": "{{baseUrl}}/api/ir/search"
+          }
+        },
+        {
+          "name": "IR evaluate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/ir/evaluate?query=hello&rankingAlgorithm=tf-idf&useStemming=false"
+          }
+        }
+      ]
+    },
+    {
+      "name": "10d - Legacy /api/evaluation",
+      "item": [
+        {
+          "name": "Evaluate search",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/evaluation/search?query=test&rankingAlgorithm=tf-idf&useStemming=false"
+          }
+        },
+        {
+          "name": "Compare tokenizers",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/evaluation/compare/tokenizers?query=test"
+          }
+        },
+        {
+          "name": "Compare stemming",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/evaluation/compare/stemming?query=test"
+          }
+        },
+        {
+          "name": "Compare ranking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/evaluation/compare/ranking?query=test"
+          }
+        }
+      ]
+    }
+  ]
+}
