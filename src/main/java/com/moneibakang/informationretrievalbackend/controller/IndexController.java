@@ -24,11 +24,31 @@ public class IndexController {
 
     private final IndexService indexService;
     private final DocumentService documentService;
+    private final IRPlatformService irPlatformService;
 
     @Autowired
-    public IndexController(IndexService indexService, DocumentService documentService) {
+    public IndexController(
+            IndexService indexService,
+            DocumentService documentService,
+            IRPlatformService irPlatformService) {
         this.indexService = indexService;
         this.documentService = documentService;
+        this.irPlatformService = irPlatformService;
+    }
+
+    /**
+     * Same behavior as {@code POST /index/build} (re-read all docs from Lucene and re-commit).
+     * Exposed under {@code /api} for clients that use a single API prefix.
+     */
+    @PostMapping("/build")
+    public ResponseEntity<Map<String, Object>> buildIndex() {
+        try {
+            Map<String, Object> status = irPlatformService.rebuildIndex();
+            return new ResponseEntity<>(status, HttpStatus.OK);
+        } catch (IOException e) {
+            logger.error("Error building index", e);
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     // Recreate the index
