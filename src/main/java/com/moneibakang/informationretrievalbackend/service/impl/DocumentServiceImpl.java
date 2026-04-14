@@ -5,24 +5,38 @@ import com.moneibakang.informationretrievalbackend.dto.SearchRequestDTO;
 import com.moneibakang.informationretrievalbackend.model.Document;
 import com.moneibakang.informationretrievalbackend.repository.LuceneDocumentRepository;
 import com.moneibakang.informationretrievalbackend.service.DocumentService;
-import org.springframework.beans.factory.annotation.Qualifier;
+import com.moneibakang.informationretrievalbackend.service.FileProcessingService;
+import com.moneibakang.informationretrievalbackend.util.CISIParser;
+import com.moneibakang.informationretrievalbackend.util.PubMedCorpusReader;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
 public class DocumentServiceImpl implements DocumentService {
     private final LuceneDocumentRepository documentRepository;
+    private final FileProcessingService fileProcessingService;
+    private final CISIParser cisiParser;
+    private final PubMedCorpusReader pubMedCorpusReader;
     private String currentRankingAlgorithm = "tf";
     private boolean lengthNormalizationEnabled = false;
     private String currentTokenizerType = "standard";
     private boolean stemmingEnabled = false;
 
-    public DocumentServiceImpl(LuceneDocumentRepository documentRepository) {
+    public DocumentServiceImpl(
+            LuceneDocumentRepository documentRepository,
+            FileProcessingService fileProcessingService,
+            CISIParser cisiParser,
+            PubMedCorpusReader pubMedCorpusReader) {
         this.documentRepository = documentRepository;
+        this.fileProcessingService = fileProcessingService;
+        this.cisiParser = cisiParser;
+        this.pubMedCorpusReader = pubMedCorpusReader;
     }
 
     @Override
@@ -67,10 +81,18 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
-    public List<Document> processAndIndexFile(MultipartFile file, String dataset, boolean useStemming, 
+    public List<Document> processAndIndexFile(MultipartFile file, String dataset, boolean useStemming,
             String rankingAlgorithm, boolean lengthNormalization) throws IOException {
-        // TODO: Implement file processing and indexing
-        throw new UnsupportedOperationException("Not implemented yet");
+        if (file == null || file.isEmpty()) {
+            throw new IOException("No file provided");
+        }
+        List<Document> documents;
+        if (dataset != null && dataset.toUpperCase(Locale.ROOT).contains("PUBMED")) {
+            documents = fileProcessingService.processPubMedXmlFile(file);
+        } else {
+            documents = fileProcessingService.processCisiFile(file);
+        }
+        return saveAll(documents);
     }
 
     @Override
@@ -137,8 +159,17 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public List<Document> processUploadedFile(MultipartFile file) throws IOException {
-        // TODO: Implement file processing
-        throw new UnsupportedOperationException("Not implemented yet");
+        if (file == null || file.isEmpty()) {
+            throw new IOException("No file provided");
+        }
+        byte[] bytes = file.getBytes();
+        String originalName = file.getOriginalFilename();
+        String name = originalName == null ? "" : originalName.toLowerCase(Locale.ROOT);
+        if (name.contains("cisi") || name.endsWith(".all")) {
+            return saveAll(cisiParser.parseDocuments(new ByteArrayInputStream(bytes)));
+        }
+        return saveAll(pubMedCorpusReader.readCorpus(
+                new ByteArrayInputStream(bytes), originalName == null ? "" : originalName));
     }
 
     private Document convertToDocument(DocumentDTO dto) {

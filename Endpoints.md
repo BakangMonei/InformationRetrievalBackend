@@ -38,6 +38,22 @@ All modern endpoints return:
 ### `DELETE /documents/{id}`
 - Delete document by ID.
 
+### Dataset upload and ingest (under `/api`)
+
+These routes parse file contents and index documents (same Lucene index as CRUD above).
+
+- **`POST /api/upload/cisi`** — multipart field `file`: CISI `.ALL` (or same field layout). Response includes `documentCount` and `documentIds`.
+- **`POST /api/upload/pubmed`** — multipart `file`: PubMed **XML** or **MEDLINE** flatfile (auto-detected from content / filename).
+- **`POST /api/documents/bulk`** — multipart `file` plus form fields:
+  - `dataset` — `CISI` (default) or `PUBMED` (selects parser).
+  - Optional: `tokenizerType`, `useStemming`, `rankingAlgorithm`, `lengthNormalization` (defaults applied if omitted).
+- **`POST /api/documents/upload`** — multipart `file`; chooses CISI if the filename contains `cisi` or ends with `.all`, otherwise PubMed-style parsing.
+
+### CISI / PubMed bulk import (legacy `/api/index`)
+
+- **`POST /api/index/import/cisi`** — optional query param `filePath`. If omitted, the server looks for `CISI.ALL` in this order: explicit `existing.file.path` from `application.properties`, then `uploaded-files/CISI.ALL`, then `src/main/resources/CISI.ALL`. **Place `CISI.ALL` in `uploaded-files/`** if it is not on the classpath.
+- **`POST /api/index/import/pubmed`** — optional `filePath`; otherwise uses `pubmed.file.path` from properties, then common `uploaded-files/*` fallbacks. Supports **XML** and **MEDLINE** formats.
+
 ---
 
 ## 2) Query CRUD

@@ -6,7 +6,6 @@ package com.moneibakang.informationretrievalbackend.controller;
  */
 
 import com.moneibakang.informationretrievalbackend.dto.*;
-import com.moneibakang.informationretrievalbackend.exception.*;
 import com.moneibakang.informationretrievalbackend.model.Document;
 import com.moneibakang.informationretrievalbackend.service.*;
 import org.slf4j.*;
@@ -20,7 +19,7 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/documents")
-@CrossOrigin(origins = "http://localhost:3000")// Allow requests from React frontend
+@CrossOrigin(origins = "*")
 public class DocumentController {
     private static final Logger logger = LoggerFactory.getLogger(DocumentController.class);
 
@@ -122,23 +121,33 @@ public class DocumentController {
 
     // BULK IMPORT - Import multiple documents
     @PostMapping("/bulk")
-    public ResponseEntity<?> bulkImportDocuments(@RequestParam("file") MultipartFile file,
-                                               @RequestParam("tokenizerType") String tokenizerType,
-                                               @RequestParam("useStemming") boolean useStemming,
-                                               @RequestParam("rankingAlgorithm") String rankingAlgorithm,
-                                               @RequestParam("lengthNormalization") boolean lengthNormalization) {
+    public ResponseEntity<?> bulkImportDocuments(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "dataset", defaultValue = "CISI") String dataset,
+            @RequestParam(value = "tokenizerType", required = false, defaultValue = "standard") String tokenizerType,
+            @RequestParam(value = "useStemming", required = false, defaultValue = "false") boolean useStemming,
+            @RequestParam(value = "rankingAlgorithm", required = false, defaultValue = "tf") String rankingAlgorithm,
+            @RequestParam(value = "lengthNormalization", required = false, defaultValue = "false") boolean lengthNormalization) {
         try {
             if (file.isEmpty()) {
                 return new ResponseEntity<>("No file provided", HttpStatus.BAD_REQUEST);
             }
 
+            try {
+                documentService.configureTokenizer(tokenizerType);
+            } catch (IOException ignored) {
+                // tokenizer wiring is optional for bulk ingest
+            }
+            documentService.configureStemming(useStemming);
+            documentService.configureRankingAlgorithm(rankingAlgorithm);
+            documentService.configureLengthNormalization(lengthNormalization);
+
             List<Document> processedDocs = documentService.processAndIndexFile(
-                file, 
-                tokenizerType, 
-                useStemming, 
-                rankingAlgorithm, 
-                lengthNormalization
-            );
+                    file,
+                    dataset,
+                    useStemming,
+                    rankingAlgorithm,
+                    lengthNormalization);
 
             return ResponseEntity.ok(processedDocs);
         } catch (Exception e) {
@@ -150,16 +159,22 @@ public class DocumentController {
 
     // FILE UPLOAD - Upload a file for information retrieval
     @PostMapping("/upload")
-    public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<Map<String, Object>> uploadFile(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
-            return new ResponseEntity<>("No file uploaded", HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>(Map.of("message", "No file uploaded"), HttpStatus.BAD_REQUEST);
         }
         try {
-            documentService.processUploadedFile(file);
-            return new ResponseEntity<>("File uploaded successfully", HttpStatus.OK);
+            List<Document> saved = documentService.processUploadedFile(file);
+            return new ResponseEntity<>(
+                    Map.of(
+                            "message", "File uploaded and indexed successfully",
+                            "documentCount", saved.size()),
+                    HttpStatus.OK);
         } catch (IOException e) {
             logger.error("Error uploading file", e);
-            return new ResponseEntity<>("Error processing file: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(
+                    Map.of("message", "Error processing file: " + e.getMessage()),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }

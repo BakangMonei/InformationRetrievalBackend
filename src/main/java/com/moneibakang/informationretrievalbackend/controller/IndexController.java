@@ -12,14 +12,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/index")
-@CrossOrigin(origins = "http://localhost:3000")// Allow requests from React frontend
+@CrossOrigin(origins = "*")
 public class IndexController {
     private static final Logger logger = LoggerFactory.getLogger(IndexController.class);
 
@@ -44,8 +43,8 @@ public class IndexController {
         }
     }
 
-    // Get index statistics
-    @GetMapping("/stats")
+    // Get index statistics ("/status" is an alias for clients that expect that path)
+    @GetMapping({"/stats", "/status"})
     public ResponseEntity<Map<String, Object>> getIndexStats() {
         try {
             Map<String, Object> stats = indexService.getIndexStatistics();
@@ -61,9 +60,7 @@ public class IndexController {
     public ResponseEntity<String> importCISICollection(
             @RequestParam(required = false) String filePath) {
         try {
-            String path = (filePath != null && !filePath.isEmpty())
-                    ? filePath
-                    : "src/main/resources/CISI.ALL";
+            String path = (filePath != null && !filePath.isEmpty()) ? filePath : null;
             indexService.importCISICollection(path);
             return new ResponseEntity<>("CISI collection imported successfully", HttpStatus.OK);
         } catch (IOException e) {
@@ -78,10 +75,7 @@ public class IndexController {
     public ResponseEntity<String> importPubMedCollection(
             @RequestParam(required = false) String filePath) {
         try {
-            // Use the provided filePath or fall back to the default one from properties
-            String path = (filePath != null && !filePath.isEmpty())
-                    ? filePath
-                    : "src/main/resources/pubmed25n0006.xml";
+            String path = (filePath != null && !filePath.isEmpty()) ? filePath : null;
             indexService.importPubMedCollection(path);
             return new ResponseEntity<>("PUBMED collection imported successfully", HttpStatus.OK);
         } catch (IOException e) {

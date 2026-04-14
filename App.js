@@ -476,14 +476,14 @@ function App() {
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
 
-    // Update allowed types to include XML
     const allowedTypes = [
       'text/plain',
       'application/json',
       'text/csv',
       'text/xml',
       'application/xml',
-      '.xml'  // For PubMed XML files
+      '.xml',
+      '.all'
     ];
     const maxSize = 1000 * 2048 * 2048; // Increased to 100MB for larger XML files
 
@@ -498,7 +498,7 @@ function App() {
       allowedTypes.includes(`.${fileExtension}`);
 
     if (!isAllowedType) {
-      toast.error('Invalid file type. Please upload a .txt, .json, .csv, or .xml file');
+      toast.error('Invalid file type. Use .all (CISI), .xml / .txt (PubMed), or .json / .csv where supported');
       return;
     }
 
@@ -507,15 +507,21 @@ function App() {
       return;
     }
 
-    // Add file type detection
-    const fileType = fileExtension === 'xml' ? 'pubmed' : 'standard';
+    const lower = file.name.toLowerCase();
+    /** Matches backend `dataset` for POST /documents/bulk */
+    let dataset = 'CISI';
+    if (fileExtension === 'xml' || (fileExtension === 'txt' && !lower.includes('cisi'))) {
+      dataset = 'PUBMED';
+    } else if (fileExtension === 'all' || lower.includes('cisi')) {
+      dataset = 'CISI';
+    }
 
     setSelectedFile({
       file,
-      type: fileType
+      dataset
     });
 
-    toast.success(`Selected ${fileType.toUpperCase()} file: ${file.name}`);
+    toast.success(`Selected file (${dataset}): ${file.name}`);
   };
 
   /**
@@ -532,10 +538,11 @@ function App() {
     setLoading(prev => ({ ...prev, upload: true }));
     const formData = new FormData();
     formData.append('file', selectedFile.file);
+    formData.append('dataset', selectedFile.dataset || 'CISI');
     formData.append('tokenizerType', searchConfig.tokenizerType);
-    formData.append('useStemming', searchConfig.useStemming);
+    formData.append('useStemming', String(searchConfig.useStemming));
     formData.append('rankingAlgorithm', searchConfig.rankingAlgorithm);
-    formData.append('lengthNormalization', searchConfig.lengthNormalization);
+    formData.append('lengthNormalization', String(searchConfig.lengthNormalization));
 
     try {
       const response = await axios.post(API_ENDPOINTS.documents.bulkImport, formData, {
@@ -544,7 +551,8 @@ function App() {
         }
       });
 
-      toast.success(`${response.data.length} documents uploaded successfully`);
+      const count = Array.isArray(response.data) ? response.data.length : 0;
+      toast.success(`${count} document(s) indexed successfully`);
       await fetchIndexStats();
     } catch (error) {
       console.error('Upload Error:', error);
@@ -599,7 +607,11 @@ function App() {
       if (error.code === 'ECONNABORTED') {
         toast.error('Import operation timed out. Please check if the backend is still processing.');
       } else {
-        const errorMessage = error.response?.data || `Error importing ${type} dataset`;
+        const raw = error.response?.data;
+        const errorMessage =
+          typeof raw === 'string'
+            ? raw
+            : raw?.message || `Error importing ${type} dataset`;
         toast.error(errorMessage);
       }
     } finally {

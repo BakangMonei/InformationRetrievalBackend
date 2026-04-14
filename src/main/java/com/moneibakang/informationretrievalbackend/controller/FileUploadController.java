@@ -8,9 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.xml.sax.SAXException;
-
-import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +29,7 @@ public class FileUploadController {
         try {
             List<Document> documents = fileProcessingService.processCisiFile(file);
             List<DocumentDTO> documentDTOs = documents.stream()
-                .map(this::convertToDTO)
+                .map(d -> convertToDTO(d, "CISI"))
                 .collect(Collectors.toList());
             documentService.bulkImportDocuments(documentDTOs);
             return ResponseEntity.ok(Map.of(
@@ -53,7 +50,7 @@ public class FileUploadController {
         try {
             List<Document> documents = fileProcessingService.processPubMedXmlFile(file);
             List<DocumentDTO> documentDTOs = documents.stream()
-                .map(this::convertToDTO)
+                .map(d -> convertToDTO(d, "PUBMED"))
                 .collect(Collectors.toList());
             documentService.bulkImportDocuments(documentDTOs);
             return ResponseEntity.ok(Map.of(
@@ -61,7 +58,7 @@ public class FileUploadController {
                 "documentCount", documentDTOs.size(),
                 "documentIds", documentDTOs.stream().map(DocumentDTO::getId).collect(Collectors.toList())
             ));
-        } catch (IOException | ParserConfigurationException | SAXException e) {
+        } catch (IOException e) {
             return ResponseEntity.badRequest().body(Map.of(
                 "error", "Failed to process PubMed file",
                 "message", e.getMessage()
@@ -104,12 +101,15 @@ public class FileUploadController {
         }
     }
 
-    private DocumentDTO convertToDTO(Document doc) {
+    private DocumentDTO convertToDTO(Document doc, String collection) {
         DocumentDTO dto = new DocumentDTO();
         dto.setId(doc.getId());
         dto.setTitle(doc.getTitle());
         dto.setAuthor(doc.getAuthor());
         dto.setContent(doc.getContent());
+        dto.setCollection(collection);
+        dto.setDataset(collection);
+        dto.setTimestamp(doc.getTimestamp() > 0 ? doc.getTimestamp() : System.currentTimeMillis());
         return dto;
     }
 }

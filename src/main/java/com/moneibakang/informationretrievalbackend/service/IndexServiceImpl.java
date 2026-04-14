@@ -8,26 +8,38 @@ package com.moneibakang.informationretrievalbackend.service;
 
 import com.moneibakang.informationretrievalbackend.model.*;
 import com.moneibakang.informationretrievalbackend.repository.*;
+import com.moneibakang.informationretrievalbackend.util.CISIParser;
+import com.moneibakang.informationretrievalbackend.util.DatasetPathResolver;
+import com.moneibakang.informationretrievalbackend.util.PubMedCorpusReader;
 import org.slf4j.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.io.*;
-import java.nio.file.*;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.*;
-import java.util.regex.*;
-import java.util.stream.Collectors;
-import org.tartarus.snowball.ext.EnglishStemmer;
 
 @Service
 public class IndexServiceImpl implements IndexService {
     private static final Logger logger = LoggerFactory.getLogger(IndexServiceImpl.class);
 
+    private static final int BATCH = 1000;
+
     private final DocumentRepository documentRepository;
+    private final CISIParser cisiParser;
+    private final DatasetPathResolver pathResolver;
+    private final PubMedCorpusReader pubMedCorpusReader;
 
     @Autowired
-    public IndexServiceImpl(DocumentRepository documentRepository) {
+    public IndexServiceImpl(
+            DocumentRepository documentRepository,
+            CISIParser cisiParser,
+            DatasetPathResolver pathResolver,
+            PubMedCorpusReader pubMedCorpusReader) {
         this.documentRepository = documentRepository;
+        this.cisiParser = cisiParser;
+        this.pathResolver = pathResolver;
+        this.pubMedCorpusReader = pubMedCorpusReader;
     }
 
     @Override
@@ -43,124 +55,49 @@ public class IndexServiceImpl implements IndexService {
 
     @Override
     public void importCISICollection(String filePath) throws IOException {
-        logger.info("Importing CISI collection from: {}", filePath);
-        Path path = Paths.get(filePath);
+        Path path = pathResolver.resolveCisiPath(
+                filePath == null || filePath.isEmpty() ? null : filePath);
+        logger.info("Importing CISI collection from: {}", path.toAbsolutePath());
 
-        if (!Files.exists(path)) {
-            throw new FileNotFoundException("CISI collection file not found: " + filePath);
+        List<Document> documents = cisiParser.parseDocuments(path.toString());
+        if (documents.isEmpty()) {
+            throw new IOException(
+                    "No CISI documents parsed from " + path.toAbsolutePath()
+                            + ". Check the file is valid CISI (.I / .T / .W) and not empty.");
         }
-
-        List<Document> documents = new ArrayList<>();
-        String content = new String(Files.readAllBytes(path));
-
-        // CISI format pattern (simplified): .I [id] .T [title] .A [author] .W [content]
-        Pattern docPattern = Pattern.compile(
-                "\\.I (\\d+)\\s+\\.T\\s+(.*?)(?=\\.A)\\s+\\.A\\s+(.*?)(?=\\.W)\\s+\\.W\\s+(.*?)(?=\\.I|$)",
-                Pattern.DOTALL);
-        Matcher matcher = docPattern.matcher(content);
-        while (matcher.find()) {
-            String id = matcher.group(1).trim();
-            String title = matcher.group(2).trim();
-            String author = matcher.group(3).trim();
-            String docContent = matcher.group(4).trim();
-
-            Document doc = new Document();
-            doc.setId("CISI-" + id);
-            doc.setTitle(title);
-            doc.setAuthor(author);
-            doc.setContent(docContent);
-            doc.setCollection("CISI");
-            doc.setTimestamp(System.currentTimeMillis());
-
-            documents.add(doc);
-            if (documents.size() >= 1000) {
-                documentRepository.bulkAddDocuments(documents);
-                documents.clear();
-            }
-        }
-        if (!documents.isEmpty()) {
-            documentRepository.bulkAddDocuments(documents);
-        }
-
-        logger.info("CISI collection import completed");
+        flushInBatches(documents);
+        logger.info("CISI collection import completed ({} documents)", documents.size());
     }
 
     @Override
     public void importPubMedCollection(String filePath) throws IOException {
-        logger.info("Importing PubMed collection from: {}", filePath);
-        Path path = Paths.get(filePath);
+        Path path = pathResolver.resolvePubmedPath(
+                filePath == null || filePath.isEmpty() ? null : filePath);
+        logger.info("Importing PubMed collection from: {}", path.toAbsolutePath());
 
-        if (!Files.exists(path)) {
-            throw new FileNotFoundException("PubMed collection file not found: " + filePath);
+        List<Document> documents = pubMedCorpusReader.readCorpus(path);
+        if (documents.isEmpty()) {
+            throw new IOException(
+                    "No PubMed documents parsed from " + path.toAbsolutePath()
+                            + ". Use a non-empty PubMed XML (e.g. efetch) or MEDLINE flatfile (PMID- / TI  - lines). "
+                            + "Optional query param: filePath=/absolute/path/to/your/file.xml");
         }
+        flushInBatches(documents);
+        logger.info("PubMed collection import completed ({} documents)", documents.size());
+    }
 
-        List<Document> documents = new ArrayList<>();
-        BufferedReader reader = new BufferedReader(new FileReader(filePath));
-
-        String line;
-        StringBuilder currentDoc = new StringBuilder();
-        String currentId = null;
-        String currentTitle = null;
-        String currentAuthor = null;
-        String currentContent = null;
-
-        while ((line = reader.readLine()) != null) {
-            if (line.startsWith("PMID- ")) {
-                // Process previous document if exists
-                if (currentId != null) {
-                    Document doc = new Document();
-                    doc.setId("PUBMED-" + currentId);
-                    doc.setTitle(currentTitle != null ? currentTitle : "");
-                    doc.setAuthor(currentAuthor != null ? currentAuthor : "");
-                    doc.setContent(currentContent != null ? currentContent : "");
-                    doc.setCollection("PUBMED");
-                    doc.setTimestamp(System.currentTimeMillis());
-
-                    documents.add(doc);
-
-                    // Process in batches
-                    if (documents.size() >= 1000) {
-                        documentRepository.bulkAddDocuments(documents);
-                        documents.clear();
-                    }
-                }
-
-                // Start new document
-                currentId = line.substring(6).trim();
-                currentTitle = null;
-                currentAuthor = null;
-                currentContent = null;
-                currentDoc = new StringBuilder();
-            } else if (line.startsWith("TI  - ")) {
-                currentTitle = line.substring(6).trim();
-            } else if (line.startsWith("AU  - ")) {
-                currentAuthor = line.substring(6).trim();
-            } else if (line.startsWith("AB  - ")) {
-                currentContent = line.substring(6).trim();
+    private void flushInBatches(List<Document> documents) throws IOException {
+        List<Document> batch = new ArrayList<>(BATCH);
+        for (Document d : documents) {
+            batch.add(d);
+            if (batch.size() >= BATCH) {
+                documentRepository.bulkAddDocuments(batch);
+                batch.clear();
             }
-
-            // Append to current document
-            currentDoc.append(line).append("\n");
         }
-
-        // Process last document
-        if (currentId != null) {
-            Document doc = new Document();
-            doc.setId("PUBMED-" + currentId);
-            doc.setTitle(currentTitle != null ? currentTitle : "");
-            doc.setAuthor(currentAuthor != null ? currentAuthor : "");
-            doc.setContent(currentContent != null ? currentContent : "");
-            doc.setCollection("PUBMED");
-            doc.setTimestamp(System.currentTimeMillis());
-
-            documents.add(doc);
+        if (!batch.isEmpty()) {
+            documentRepository.bulkAddDocuments(batch);
         }
-        if (!documents.isEmpty()) {
-            documentRepository.bulkAddDocuments(documents);
-        }
-
-        reader.close();
-        logger.info("PubMed collection import completed");
     }
 
     @Override
@@ -172,23 +109,6 @@ public class IndexServiceImpl implements IndexService {
         metrics.put("average_precision", 0.65);
         metrics.put("ndcg@10", 0.75);
         return metrics;
-    }
-
-    private List<String> whitespaceTokenizer(String content) {
-        return Arrays.asList(content.split("\\s+"));
-    }
-
-    private List<String> advancedTokenizer(String content) {
-        return Arrays.asList(content.toLowerCase().split("\\W+"));
-    }
-
-    private List<String> applyStemming(List<String> tokens) {
-        EnglishStemmer stemmer = new EnglishStemmer();
-        return tokens.stream().map(token -> {
-            stemmer.setCurrent(token);
-            stemmer.stem();
-            return stemmer.getCurrent();
-        }).collect(Collectors.toList());
     }
 
     public void evaluateRetrievalEffectiveness() {

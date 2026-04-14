@@ -31,6 +31,7 @@ public class DocumentDTO {
         this.title = document.getTitle();
         this.content = document.getContent();
         this.collection = document.getCollection();
+        this.dataset = document.getDataset();
         this.author = document.getAuthor();
         this.timestamp = document.getTimestamp();
     }
@@ -42,6 +43,7 @@ public class DocumentDTO {
         doc.setTitle(this.title);
         doc.setContent(this.content);
         doc.setCollection(this.collection);
+        doc.setDataset(this.dataset);
         doc.setAuthor(this.author);
         doc.setTimestamp(this.timestamp);
         return doc;

@@ -7,7 +7,11 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
-import org.apache.lucene.index.*;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.search.*;
@@ -44,7 +48,7 @@ public class LuceneDocumentRepositoryImpl implements LuceneDocumentRepository {
         }
 
         try (IndexWriter writer = getIndexWriter()) {
-            writer.addDocument(convertToLuceneDocument(document));
+            writer.updateDocument(new Term("id", document.getId()), convertToLuceneDocument(document));
             writer.commit();
         }
         return document;
@@ -58,7 +62,7 @@ public class LuceneDocumentRepositoryImpl implements LuceneDocumentRepository {
                 if (doc.getId() == null || doc.getId().isEmpty()) {
                     doc.setId(UUID.randomUUID().toString());
                 }
-                writer.addDocument(convertToLuceneDocument(doc));
+                writer.updateDocument(new Term("id", doc.getId()), convertToLuceneDocument(doc));
                 savedDocs.add(doc);
             }
             writer.commit();
@@ -163,12 +167,12 @@ public class LuceneDocumentRepositoryImpl implements LuceneDocumentRepository {
     @Override
     public org.apache.lucene.document.Document convertToLuceneDocument(Document document) {
         org.apache.lucene.document.Document luceneDoc = new org.apache.lucene.document.Document();
-        luceneDoc.add(new StringField("id", document.getId(), Field.Store.YES));
-        luceneDoc.add(new TextField("title", document.getTitle(), Field.Store.YES));
-        luceneDoc.add(new TextField("content", document.getContent(), Field.Store.YES));
-        luceneDoc.add(new StringField("author", document.getAuthor(), Field.Store.YES));
-        luceneDoc.add(new StringField("dataset", document.getDataset(), Field.Store.YES));
-        luceneDoc.add(new StringField("collection", document.getCollection(), Field.Store.YES));
+        luceneDoc.add(new StringField("id", safe(document.getId()), Field.Store.YES));
+        luceneDoc.add(new TextField("title", safe(document.getTitle()), Field.Store.YES));
+        luceneDoc.add(new TextField("content", safe(document.getContent()), Field.Store.YES));
+        luceneDoc.add(new StringField("author", safe(document.getAuthor()), Field.Store.YES));
+        luceneDoc.add(new StringField("dataset", safe(document.getDataset()), Field.Store.YES));
+        luceneDoc.add(new StringField("collection", safe(document.getCollection()), Field.Store.YES));
         luceneDoc.add(new StringField("timestamp", String.valueOf(document.getTimestamp()), Field.Store.YES));
         int year = java.time.Instant.ofEpochMilli(document.getTimestamp())
                 .atZone(java.time.ZoneId.systemDefault())
@@ -197,6 +201,10 @@ public class LuceneDocumentRepositoryImpl implements LuceneDocumentRepository {
         }
         
         return document;
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value;
     }
 
     @Override

@@ -684,6 +684,11 @@
                   "src": []
                 },
                 {
+                  "key": "dataset",
+                  "type": "text",
+                  "value": "CISI"
+                },
+                {
                   "key": "tokenizerType",
                   "type": "text",
                   "value": "standard"
@@ -773,7 +778,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/index/import/cisi",
-            "description": "Omit filePath query to use default CISI.ALL path."
+            "description": "Optional query param filePath. If omitted, resolves CISI.ALL via application.properties (existing.file.path), then uploaded-files/CISI.ALL, then src/main/resources/CISI.ALL."
           }
         },
         {
@@ -786,7 +791,8 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{baseUrl}}/api/index/import/pubmed"
+            "url": "{{baseUrl}}/api/index/import/pubmed",
+            "description": "Optional filePath. If omitted, uses pubmed.file.path and uploaded-files fallbacks. Supports PubMed XML and MEDLINE flatfile."
           }
         },
         {
