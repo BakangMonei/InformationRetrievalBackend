@@ -71,8 +71,21 @@ axios.interceptors.response.use(
  * @property {boolean} recreate - Loading state for index recreation
  */
 
+/** Maps UI ranking label to backend `model` query param for GET /api/search */
+function rankingToSearchModel(algorithm) {
+  if (!algorithm) return 'bm25';
+  const a = String(algorithm).toLowerCase();
+  if (a.includes('tf-idf') || a === 'tfidf') return 'tfidf';
+  if (a === 'tf' || a.includes('frequency')) return 'tf';
+  if (a.includes('bm25')) return 'bm25';
+  if (a.includes('norm')) return 'normalized';
+  return 'bm25';
+}
+
 // Add API endpoints from controllers
 const API_ENDPOINTS = {
+  /** GET /api/search — same as GET /search, ApiResponse envelope */
+  search: '/search',
   // IR Controller endpoints
   ir: {
     index: '/ir/index',
@@ -178,6 +191,7 @@ const DocumentDetailModal = ({ selectedDoc, setSelectedDoc, currentPage, fetchDo
 function App() {
   const [documents, setDocuments] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
   const [indexMetrics, setIndexMetrics] = useState(null);
   const [indexStats, setIndexStats] = useState(null);
   const [config, setConfig] = useState({
@@ -202,7 +216,7 @@ function App() {
   const [searchConfig, setSearchConfig] = useState({
     tokenizerType: 'standard',
     useStemming: false,
-    rankingAlgorithm: 'tf-idf',
+    rankingAlgorithm: 'bm25',
     lengthNormalization: true,
     evaluationMode: false,
     useRelevanceJudgments: false,
@@ -254,7 +268,7 @@ function App() {
       return;
     }
 
-    toast.promise(
+    await toast.promise(
       Promise.all([
         fetchIndexStats(),
         fetchIndexMetrics(),
@@ -266,6 +280,9 @@ function App() {
         error: 'Some data could not be loaded'
       }
     );
+    if (connectionStatus.indexExists) {
+      fetchDocuments(0);
+    }
   }, []); // Add dependencies if needed
 
   // Update useEffect to use fetchInitialData
@@ -407,7 +424,11 @@ function App() {
     // First check if index exists
     try {
       const statsResponse = await axios.get(API_ENDPOINTS.index.stats);
-      if (!statsResponse.data || !statsResponse.data.documentCount) {
+      const docCount =
+        statsResponse.data?.numDocs ??
+        statsResponse.data?.documentCount ??
+        0;
+      if (!statsResponse.data || docCount < 1) {
         toast.error('No index found. Please import a dataset or upload documents first.');
         return;
       }
@@ -418,50 +439,66 @@ function App() {
 
     setLoading(prev => ({ ...prev, search: true }));
     try {
-      const response = await axios.post(API_ENDPOINTS.ir.search, {
-        query: searchQuery,
-        tokenizerType: searchConfig.tokenizerType,
-        useStemming: searchConfig.useStemming,
-        rankingAlgorithm: searchConfig.rankingAlgorithm,
-        lengthNormalization: searchConfig.lengthNormalization
+      const response = await axios.get(API_ENDPOINTS.search, {
+        params: {
+          query: searchQuery.trim(),
+          model: rankingToSearchModel(searchConfig.rankingAlgorithm),
+          tokenizer: searchConfig.tokenizerType,
+          stemming: searchConfig.useStemming,
+          expansion: false,
+          operator: 'AND',
+          page: 0,
+          size: 20
+        }
       });
 
-      if (response.data && response.data.documents) {
-        setDocuments(response.data.documents);
-        
-        // Update metrics
-        if (response.data.metrics) {
-          setIndexMetrics({
-            ...response.data.metrics,
-            totalHits: response.data.totalHits || 0,
-            queryTime: response.data.searchTime || 0,
-            tokenizationTime: response.data.metrics.tokenizationTime || 0,
-            rankingTime: response.data.metrics.rankingTime || 0,
-            numberOfTokens: response.data.metrics.tokenCount || 0,
-            precision: response.data.metrics.precision || 0,
-            recall: response.data.metrics.recall || 0,
-            f1Score: response.data.metrics.f1Score || 0
-          });
-        }
+      const root = response.data;
+      const payload = root?.data != null ? root.data : root;
+      const rawResults = Array.isArray(payload?.results) ? payload.results : [];
 
-        if (searchConfig.evaluationMode) {
-          const evaluationResponse = await axios.post(API_ENDPOINTS.ir.evaluate, null, {
-            params: {
-              query: searchQuery,
-              rankingAlgorithm: searchConfig.rankingAlgorithm,
-              useStemming: searchConfig.useStemming
-            }
-          });
-          setEvaluationMetrics(evaluationResponse.data);
-        }
-      } else {
-        setDocuments([]);
+      const normalized = rawResults.map((r) => ({
+        id: r.id,
+        title: r.title,
+        content: r.content,
+        author: r.author,
+        dataset: r.dataset,
+        collection: r.category,
+        score: typeof r.score === 'number' ? r.score : Number.parseFloat(r.score) || 0
+      }));
+
+      setSearchResults(normalized);
+
+      setIndexMetrics({
+        totalHits: payload?.totalHits ?? 0,
+        queryTime: payload?.latencyMs ?? 0,
+        queryId: payload?.queryId,
+        page: payload?.page,
+        size: payload?.size,
+        precision: root?.metrics?.precision ?? 0,
+        recall: root?.metrics?.recall ?? 0,
+        f1Score: root?.metrics?.f1Score ?? 0,
+        numberOfTokens: normalized.length
+      });
+
+      if (!normalized.length) {
         toast.info('No results found');
+      }
+
+      if (searchConfig.evaluationMode) {
+        const evaluationResponse = await axios.post(API_ENDPOINTS.ir.evaluate, null, {
+          params: {
+            query: searchQuery,
+            rankingAlgorithm: searchConfig.rankingAlgorithm,
+            useStemming: searchConfig.useStemming
+          }
+        });
+        const evalBody = evaluationResponse.data?.data ?? evaluationResponse.data;
+        setEvaluationMetrics(evalBody);
       }
     } catch (error) {
       console.error('Search Error:', error);
       toast.error('Search failed. Please try again.');
-      setDocuments([]);
+      setSearchResults([]);
       setIndexMetrics(null);
     } finally {
       setLoading(prev => ({ ...prev, search: false }));
@@ -737,6 +774,7 @@ function App() {
             }}
             className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
           >
+            <option value="bm25">BM25 (default)</option>
             <option value="tf-idf">TF-IDF</option>
             <option value="tf">Term Frequency</option>
           </select>
@@ -783,9 +821,9 @@ function App() {
                   {doc.content}
                 </p>
               )}
-              {doc.score && (
+              {doc.score != null && !Number.isNaN(Number(doc.score)) && (
                 <p className="text-sm text-gray-500 mt-2">
-                  Relevance Score: {doc.score.toFixed(4)}
+                  Relevance Score: {Number(doc.score).toFixed(4)}
                 </p>
               )}
             </div>
@@ -1140,6 +1178,11 @@ function App() {
               )}
             </button>
           </form>
+          {searchResults.length === 0 && (
+            <p className="mt-3 text-sm text-gray-500">
+              Run a search to see ranked results below. Use keywords from your indexed CISI (or other) documents.
+            </p>
+          )}
         </div>
 
         {/* Add health warning if unhealthy */}
@@ -1275,7 +1318,7 @@ function App() {
         <ComparisonVisualization metrics={indexMetrics} />
 
         {/* Search Results */}
-        <SearchResults documents={documents} />
+        <SearchResults documents={searchResults} />
 
         {/* Metrics Visualization */}
         {indexMetrics && <MetricsVisualization metrics={indexMetrics} />}

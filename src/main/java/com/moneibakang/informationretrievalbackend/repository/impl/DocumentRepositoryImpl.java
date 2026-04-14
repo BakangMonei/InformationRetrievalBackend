@@ -62,9 +62,11 @@ public class DocumentRepositoryImpl implements DocumentRepository {
     public SearchResponseDTO search(SearchRequestDTO searchRequest) throws IOException {
         List<Document> results = luceneRepository.search(searchRequest.getQuery(), currentRankingAlgorithm);
         SearchResponseDTO response = new SearchResponseDTO();
-        response.setDocuments(results.stream()
+        List<com.moneibakang.informationretrievalbackend.dto.DocumentDTO> dtos = results.stream()
                 .map(doc -> new com.moneibakang.informationretrievalbackend.dto.DocumentDTO(doc))
-                .toList());
+                .toList();
+        response.setDocuments(dtos);
+        response.setTotalHits(dtos.size());
         return response;
     }
 

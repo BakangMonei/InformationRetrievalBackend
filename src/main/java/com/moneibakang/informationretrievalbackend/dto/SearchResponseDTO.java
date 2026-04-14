@@ -26,7 +26,6 @@ public class SearchResponseDTO {
 
     public void setDocuments(List<DocumentDTO> documents) {
         this.documents = documents;
-        this.totalHits = documents != null ? documents.size() : 0;
     }
 
     public long getTotalHits() {
