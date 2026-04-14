@@ -3,6 +3,7 @@ package com.moneibakang.informationretrievalbackend.service.impl;
 import com.moneibakang.informationretrievalbackend.dto.DocumentDTO;
 import com.moneibakang.informationretrievalbackend.dto.SearchRequestDTO;
 import com.moneibakang.informationretrievalbackend.model.Document;
+import com.moneibakang.informationretrievalbackend.config.IndexAnalysisSettings;
 import com.moneibakang.informationretrievalbackend.repository.LuceneDocumentRepository;
 import com.moneibakang.informationretrievalbackend.service.DocumentService;
 import com.moneibakang.informationretrievalbackend.service.FileProcessingService;
@@ -23,6 +24,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final FileProcessingService fileProcessingService;
     private final CISIParser cisiParser;
     private final PubMedCorpusReader pubMedCorpusReader;
+    private final IndexAnalysisSettings indexAnalysisSettings;
     private String currentRankingAlgorithm = "tf";
     private boolean lengthNormalizationEnabled = false;
     private String currentTokenizerType = "standard";
@@ -32,11 +34,13 @@ public class DocumentServiceImpl implements DocumentService {
             LuceneDocumentRepository documentRepository,
             FileProcessingService fileProcessingService,
             CISIParser cisiParser,
-            PubMedCorpusReader pubMedCorpusReader) {
+            PubMedCorpusReader pubMedCorpusReader,
+            IndexAnalysisSettings indexAnalysisSettings) {
         this.documentRepository = documentRepository;
         this.fileProcessingService = fileProcessingService;
         this.cisiParser = cisiParser;
         this.pubMedCorpusReader = pubMedCorpusReader;
+        this.indexAnalysisSettings = indexAnalysisSettings;
     }
 
     @Override
@@ -72,7 +76,10 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public List<Document> searchDocuments(SearchRequestDTO searchRequest) throws IOException {
-        return documentRepository.search(searchRequest.getQuery(), currentRankingAlgorithm);
+        String ranking = searchRequest.getRankingAlgorithm() != null && !searchRequest.getRankingAlgorithm().isBlank()
+                ? searchRequest.getRankingAlgorithm()
+                : currentRankingAlgorithm;
+        return documentRepository.search(searchRequest.getQuery(), ranking);
     }
 
     @Override
@@ -117,8 +124,8 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public void configureTokenizer(String type) throws IOException {
-        this.currentTokenizerType = type;
-        // TODO: Implement tokenizer configuration in repository
+        this.currentTokenizerType = type != null ? type : "standard";
+        indexAnalysisSettings.setTokenizerType(this.currentTokenizerType);
     }
 
     @Override
@@ -129,7 +136,7 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public void configureStemming(boolean enabled) throws IOException {
         this.stemmingEnabled = enabled;
-        // TODO: Implement stemming configuration in repository
+        indexAnalysisSettings.setStemming(enabled);
     }
 
     @Override

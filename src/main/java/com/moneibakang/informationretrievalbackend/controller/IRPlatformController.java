@@ -101,9 +101,11 @@ public class IRPlatformController {
             @RequestParam(required = false) String keywords,
             @RequestParam(defaultValue = "AND") String operator,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) throws IOException {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "true") boolean lengthNorm) throws IOException {
         log.info("GET /search called query={} model={} tokenizer={} page={} size={}", query, model, tokenizer, page, size);
-        Map<String, Object> result = service.search(query, model, tokenizer, stemming, expansion, category, year, keywords, operator, page, size);
+        Map<String, Object> result = service.search(
+                query, model, tokenizer, stemming, expansion, category, year, keywords, operator, page, size, lengthNorm);
         return ResponseEntity.ok(ApiResponse.ok(result, "Search completed", HttpStatus.OK.value()));
     }
 
@@ -231,8 +233,12 @@ public class IRPlatformController {
                                                                           @RequestParam(defaultValue = "false") boolean stemming,
                                                                           @RequestParam(defaultValue = "bm25") String model,
                                                                           @RequestParam(defaultValue = "0") int page,
-                                                                          @RequestParam(defaultValue = "10") int size) throws IOException {
-        return ResponseEntity.ok(ApiResponse.ok(service.searchVariant(query, dataset, tokenizer, stemming, model, page, size), "Variant search complete", HttpStatus.OK.value()));
+                                                                          @RequestParam(defaultValue = "10") int size,
+                                                                          @RequestParam(defaultValue = "true") boolean lengthNorm) throws IOException {
+        return ResponseEntity.ok(ApiResponse.ok(
+                service.searchVariant(query, dataset, tokenizer, stemming, model, page, size, lengthNorm),
+                "Variant search complete",
+                HttpStatus.OK.value()));
     }
 
     @PostMapping("/experiments/run")

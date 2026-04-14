@@ -1,20 +1,27 @@
 package com.moneibakang.informationretrievalbackend.repository.impl;
 
+import com.moneibakang.informationretrievalbackend.config.IndexAnalysisSettings;
 import com.moneibakang.informationretrievalbackend.model.Document;
 import com.moneibakang.informationretrievalbackend.repository.LuceneDocumentRepository;
+import com.moneibakang.informationretrievalbackend.util.AnalyzerFactory;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.ParseException;
-import org.apache.lucene.search.*;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.MatchAllDocsQuery;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.similarities.BM25Similarity;
 import org.apache.lucene.search.similarities.ClassicSimilarity;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -26,6 +33,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -33,12 +41,16 @@ import java.util.UUID;
 @Repository
 public class LuceneDocumentRepositoryImpl implements LuceneDocumentRepository {
     private final Directory directory;
-    private final Analyzer analyzer;
+    private final AnalyzerFactory analyzerFactory;
+    private final IndexAnalysisSettings indexAnalysisSettings;
 
-    public LuceneDocumentRepositoryImpl() throws IOException {
+    public LuceneDocumentRepositoryImpl(
+            AnalyzerFactory analyzerFactory,
+            IndexAnalysisSettings indexAnalysisSettings) throws IOException {
         Path indexPath = Paths.get("index");
         this.directory = FSDirectory.open(indexPath);
-        this.analyzer = new StandardAnalyzer();
+        this.analyzerFactory = analyzerFactory;
+        this.indexAnalysisSettings = indexAnalysisSettings;
     }
 
     @Override
@@ -120,35 +132,49 @@ public class LuceneDocumentRepositoryImpl implements LuceneDocumentRepository {
 
     @Override
     public List<Document> search(String query, String rankingAlgorithm) throws IOException {
-        try (IndexReader reader = DirectoryReader.open(directory)) {
-            IndexSearcher searcher = new IndexSearcher(reader);
-            
-            // Set similarity based on ranking algorithm
-            if ("tf".equals(rankingAlgorithm)) {
-                searcher.setSimilarity(new ClassicSimilarity() {
-                    @Override
-                    public float idf(long docFreq, long docCount) {
-                        return 1.0f; // Neutralize IDF component
+        try (Analyzer analyzer = analyzerFactory.getAnalyzer(
+                indexAnalysisSettings.getTokenizerType(),
+                indexAnalysisSettings.isStemming())) {
+            try (IndexReader reader = DirectoryReader.open(directory)) {
+                IndexSearcher searcher = new IndexSearcher(reader);
+                applySimilarity(searcher, rankingAlgorithm);
+
+                try {
+                    QueryParser parser = new QueryParser("content", analyzer);
+                    Query luceneQuery = parser.parse(query);
+                    TopDocs hits = searcher.search(luceneQuery, 100);
+
+                    List<Document> documents = new ArrayList<>();
+                    for (ScoreDoc scoreDoc : hits.scoreDocs) {
+                        org.apache.lucene.document.Document luceneDoc =
+                                searcher.storedFields().document(scoreDoc.doc);
+                        documents.add(convertToDocument(luceneDoc));
                     }
-                });
-            } else {
-                searcher.setSimilarity(new ClassicSimilarity()); // TF-IDF
-            }
-
-            try {
-                QueryParser parser = new QueryParser("content", analyzer);
-                Query luceneQuery = parser.parse(query);
-                TopDocs hits = searcher.search(luceneQuery, 100);
-
-                List<Document> documents = new ArrayList<>();
-                for (ScoreDoc scoreDoc : hits.scoreDocs) {
-                    org.apache.lucene.document.Document luceneDoc = searcher.storedFields().document(scoreDoc.doc);
-                    documents.add(convertToDocument(luceneDoc));
+                    return documents;
+                } catch (ParseException e) {
+                    throw new IOException("Error parsing query: " + e.getMessage(), e);
                 }
-                return documents;
-            } catch (ParseException e) {
-                throw new IOException("Error parsing query: " + e.getMessage(), e);
             }
+        }
+    }
+
+    private static void applySimilarity(IndexSearcher searcher, String rankingAlgorithm) {
+        if (rankingAlgorithm == null) {
+            searcher.setSimilarity(new BM25Similarity());
+            return;
+        }
+        String r = rankingAlgorithm.toLowerCase(Locale.ROOT);
+        if (r.contains("bm25")) {
+            searcher.setSimilarity(new BM25Similarity());
+        } else if ("tf".equals(r) || r.contains("frequency")) {
+            searcher.setSimilarity(new ClassicSimilarity() {
+                @Override
+                public float idf(long docFreq, long docCount) {
+                    return 1.0f;
+                }
+            });
+        } else {
+            searcher.setSimilarity(new ClassicSimilarity());
         }
     }
 
@@ -161,6 +187,8 @@ public class LuceneDocumentRepositoryImpl implements LuceneDocumentRepository {
             stats.put("maxDoc", reader.maxDoc());
             stats.put("hasDeletions", reader.hasDeletions());
         }
+        stats.put("indexTokenizer", indexAnalysisSettings.getTokenizerType());
+        stats.put("indexStemming", indexAnalysisSettings.isStemming());
         return stats;
     }
 
@@ -190,7 +218,7 @@ public class LuceneDocumentRepositoryImpl implements LuceneDocumentRepository {
         document.setAuthor(luceneDoc.get("author"));
         document.setDataset(luceneDoc.get("dataset"));
         document.setCollection(luceneDoc.get("collection"));
-        
+
         String timestampStr = luceneDoc.get("timestamp");
         if (timestampStr != null && !timestampStr.isEmpty()) {
             try {
@@ -199,7 +227,7 @@ public class LuceneDocumentRepositoryImpl implements LuceneDocumentRepository {
                 document.setTimestamp(System.currentTimeMillis());
             }
         }
-        
+
         return document;
     }
 
@@ -214,6 +242,9 @@ public class LuceneDocumentRepositoryImpl implements LuceneDocumentRepository {
 
     @Override
     public IndexWriter getIndexWriter() throws IOException {
+        Analyzer analyzer = analyzerFactory.getAnalyzer(
+                indexAnalysisSettings.getTokenizerType(),
+                indexAnalysisSettings.isStemming());
         IndexWriterConfig config = new IndexWriterConfig(analyzer);
         config.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND);
         return new IndexWriter(directory, config);
@@ -223,4 +254,4 @@ public class LuceneDocumentRepositoryImpl implements LuceneDocumentRepository {
     public IndexSearcher getIndexSearcher() throws IOException {
         return new IndexSearcher(DirectoryReader.open(directory));
     }
-} 
+}

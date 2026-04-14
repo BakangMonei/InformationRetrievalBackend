@@ -43,10 +43,11 @@ public class ApiSearchController {
             @RequestParam(required = false) String keywords,
             @RequestParam(defaultValue = "AND") String operator,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) throws IOException {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "true") boolean lengthNorm) throws IOException {
         log.info("GET /api/search called query={} model={} tokenizer={} page={} size={}", query, model, tokenizer, page, size);
         Map<String, Object> result = irPlatformService.search(
-                query, model, tokenizer, stemming, expansion, category, year, keywords, operator, page, size);
+                query, model, tokenizer, stemming, expansion, category, year, keywords, operator, page, size, lengthNorm);
         return ResponseEntity.ok(ApiResponse.ok(result, "Search completed", 200));
     }
 

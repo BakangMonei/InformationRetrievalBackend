@@ -3,6 +3,7 @@ package com.moneibakang.informationretrievalbackend.repository.impl;
 import com.moneibakang.informationretrievalbackend.dto.SearchRequestDTO;
 import com.moneibakang.informationretrievalbackend.dto.SearchResponseDTO;
 import com.moneibakang.informationretrievalbackend.model.Document;
+import com.moneibakang.informationretrievalbackend.config.IndexAnalysisSettings;
 import com.moneibakang.informationretrievalbackend.repository.DocumentRepository;
 import com.moneibakang.informationretrievalbackend.repository.LuceneDocumentRepository;
 import org.springframework.stereotype.Repository;
@@ -13,13 +14,15 @@ import java.util.*;
 @Repository
 public class DocumentRepositoryImpl implements DocumentRepository {
     private final LuceneDocumentRepository luceneRepository;
+    private final IndexAnalysisSettings indexAnalysisSettings;
     private String currentTokenizerType = "standard";
     private boolean stemmingEnabled = false;
     private String currentRankingAlgorithm = "tf-idf";
     private boolean lengthNormalizationEnabled = false;
 
-    public DocumentRepositoryImpl(LuceneDocumentRepository luceneRepository) {
+    public DocumentRepositoryImpl(LuceneDocumentRepository luceneRepository, IndexAnalysisSettings indexAnalysisSettings) {
         this.luceneRepository = luceneRepository;
+        this.indexAnalysisSettings = indexAnalysisSettings;
     }
 
     @Override
@@ -60,7 +63,10 @@ public class DocumentRepositoryImpl implements DocumentRepository {
 
     @Override
     public SearchResponseDTO search(SearchRequestDTO searchRequest) throws IOException {
-        List<Document> results = luceneRepository.search(searchRequest.getQuery(), currentRankingAlgorithm);
+        String ranking = searchRequest.getRankingAlgorithm() != null && !searchRequest.getRankingAlgorithm().isBlank()
+                ? searchRequest.getRankingAlgorithm()
+                : currentRankingAlgorithm;
+        List<Document> results = luceneRepository.search(searchRequest.getQuery(), ranking);
         SearchResponseDTO response = new SearchResponseDTO();
         List<com.moneibakang.informationretrievalbackend.dto.DocumentDTO> dtos = results.stream()
                 .map(doc -> new com.moneibakang.informationretrievalbackend.dto.DocumentDTO(doc))
@@ -82,12 +88,14 @@ public class DocumentRepositoryImpl implements DocumentRepository {
 
     @Override
     public void setTokenizer(String tokenizerType) {
-        this.currentTokenizerType = tokenizerType;
+        this.currentTokenizerType = tokenizerType != null ? tokenizerType : "standard";
+        indexAnalysisSettings.setTokenizerType(this.currentTokenizerType);
     }
 
     @Override
     public void setStemming(boolean enabled) {
         this.stemmingEnabled = enabled;
+        indexAnalysisSettings.setStemming(enabled);
     }
 
     @Override

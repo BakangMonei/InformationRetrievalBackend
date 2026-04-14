@@ -81,7 +81,8 @@ public class IRController {
                 null,
                 "AND",
                 request.getPage(),
-                request.getResultsPerPage() > 0 ? request.getResultsPerPage() : 10);
+                request.getResultsPerPage() > 0 ? request.getResultsPerPage() : 10,
+                request.isApplyLengthNormalization());
         return ResponseEntity.ok(toSearchResponse(raw));
     }
 

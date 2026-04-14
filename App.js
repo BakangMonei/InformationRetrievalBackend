@@ -86,6 +86,10 @@ function rankingToSearchModel(algorithm) {
 const API_ENDPOINTS = {
   /** GET /api/search — same as GET /search, ApiResponse envelope */
   search: '/search',
+  experiments: {
+    runCisi: '/experiments/run',
+    datasetEval: '/experiments/dataset-eval'
+  },
   // IR Controller endpoints
   ir: {
     index: '/ir/index',
@@ -205,7 +209,8 @@ function App() {
     search: false,
     upload: false,
     import: false,
-    recreate: false
+    recreate: false,
+    eval: false
   });
   const [serverStatus, setServerStatus] = useState('checking');
   const [selectedDoc, setSelectedDoc] = useState(null);
@@ -448,7 +453,8 @@ function App() {
           expansion: false,
           operator: 'AND',
           page: 0,
-          size: 20
+          size: 20,
+          lengthNorm: searchConfig.lengthNormalization
         }
       });
 
@@ -653,6 +659,51 @@ function App() {
       }
     } finally {
       setLoading(prev => ({ ...prev, import: false }));
+    }
+  };
+
+  /**
+   * Full CISI grid: tokenizers × stemming × ranking models (for report / marking).
+   * Requires CISI indexed and default CISI.QRY / CISI.REL on the server.
+   */
+  const handleRunBenchmark = async () => {
+    setLoading((prev) => ({ ...prev, eval: true }));
+    const progressToast = toast.loading('Running CISI benchmark (several minutes possible)…');
+    try {
+      const { data } = await axios.post(API_ENDPOINTS.experiments.runCisi, null, {
+        baseURL: API_BASE_URL,
+        timeout: 600000
+      });
+      const body = data?.data ?? data;
+      const rows = body?.comparisons?.length ?? 0;
+      toast.success(`Benchmark complete (${rows} configuration rows). Open console for JSON.`, { id: progressToast });
+      console.log('CISI experiment result', body);
+    } catch (error) {
+      const msg = error?.response?.data?.message || error?.message || 'Benchmark failed';
+      toast.error(String(msg), { id: progressToast });
+    } finally {
+      setLoading((prev) => ({ ...prev, eval: false }));
+    }
+  };
+
+  /** Quick MAP / P / R on CISI using default query and relevance files */
+  const handleDatasetEval = async () => {
+    setLoading((prev) => ({ ...prev, eval: true }));
+    try {
+      const { data } = await axios.get(API_ENDPOINTS.experiments.datasetEval, {
+        baseURL: API_BASE_URL,
+        params: { dataset: 'CISI' },
+        timeout: 600000
+      });
+      const body = data?.data ?? data;
+      toast.success(
+        `Queries: ${body.queriesEvaluated ?? 0} — MAP ${(body.map ?? 0).toFixed(4)}, P ${(body.precision ?? 0).toFixed(4)}, R ${(body.recall ?? 0).toFixed(4)}`
+      );
+      console.log('Dataset evaluation', body);
+    } catch (e) {
+      toast.error('Dataset evaluation failed');
+    } finally {
+      setLoading((prev) => ({ ...prev, eval: false }));
     }
   };
 
@@ -1294,6 +1345,29 @@ function App() {
               >
                 {loading.import ? <Loader className="animate-spin" /> : <ChevronRight />}
                 Import PubMed
+              </button>
+            </div>
+            <p className="mt-4 text-sm text-gray-600">
+              After CISI is indexed, run evaluation for your report: compares tokenizers (standard vs simple),
+              stem on/off, and ranking models (BM25, TF, TF‑IDF, normalized Lucene scoring).
+            </p>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={handleRunBenchmark}
+                disabled={loading.eval || loading.import}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {loading.eval ? <Loader className="animate-spin h-4 w-4" /> : <BarChart className="h-4 w-4" />}
+                Run full CISI benchmark
+              </button>
+              <button
+                type="button"
+                onClick={handleDatasetEval}
+                disabled={loading.eval || loading.import}
+                className="px-4 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700 disabled:opacity-50"
+              >
+                Quick CISI MAP (default QRY/REL)
               </button>
             </div>
           </div>

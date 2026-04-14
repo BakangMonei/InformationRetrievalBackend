@@ -134,12 +134,28 @@ public class IRPlatformService {
                                       String operator,
                                       int page,
                                       int size) throws IOException {
+        return search(
+                query, model, tokenizer, stemming, expansion, category, year, keywords, operator, page, size, true);
+    }
+
+    public Map<String, Object> search(String query,
+                                      String model,
+                                      String tokenizer,
+                                      boolean stemming,
+                                      boolean expansion,
+                                      String category,
+                                      Integer year,
+                                      String keywords,
+                                      String operator,
+                                      int page,
+                                      int size,
+                                      boolean lengthNormalization) throws IOException {
         long start = System.currentTimeMillis();
         String queryText = expansion ? expandQuery(query, 5) : query;
 
         try (DirectoryReader reader = DirectoryReader.open(repository.getDirectory())) {
             IndexSearcher searcher = new IndexSearcher(reader);
-            setSimilarity(searcher, model);
+            setSimilarity(searcher, model, lengthNormalization);
             Query luceneQuery = buildQuery(queryText, category, year, keywords, operator, tokenizer, stemming);
             TopDocs topDocs = searcher.search(luceneQuery, Math.max(100, (page + 1) * size));
 
@@ -198,7 +214,8 @@ public class IRPlatformService {
     }
 
     public String expandQuery(String query, int topTerms) throws IOException {
-        Map<String, Object> initial = search(query, "bm25", "standard", false, false, null, null, null, "AND", 0, 5);
+        Map<String, Object> initial =
+                search(query, "bm25", "standard", false, false, null, null, null, "AND", 0, 5, true);
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> results = (List<Map<String, Object>>) initial.get("results");
         Map<String, Integer> tf = new HashMap<>();
@@ -361,9 +378,10 @@ public class IRPlatformService {
         return builder.build();
     }
 
-    private void setSimilarity(IndexSearcher searcher, String model) {
+    private void setSimilarity(IndexSearcher searcher, String model, boolean lengthNormalization) {
         if ("bm25".equalsIgnoreCase(model)) {
-            searcher.setSimilarity(new BM25Similarity());
+            float b = lengthNormalization ? 0.75f : 0f;
+            searcher.setSimilarity(new BM25Similarity(1.2f, b));
             return;
         }
         if ("tf".equalsIgnoreCase(model)) {
@@ -488,6 +506,18 @@ public class IRPlatformService {
     }
 
     public Map<String, Object> searchVariant(String query, String dataset, String tokenizer, boolean stemming, String model, int page, int size) throws IOException {
+        return searchVariant(query, dataset, tokenizer, stemming, model, page, size, true);
+    }
+
+    public Map<String, Object> searchVariant(
+            String query,
+            String dataset,
+            String tokenizer,
+            boolean stemming,
+            String model,
+            int page,
+            int size,
+            boolean lengthNormalization) throws IOException {
         String key = variantKey(dataset, tokenizer, stemming);
         Path path = variantIndexPaths.getOrDefault(key, Paths.get("index_variants", key));
         if (!Files.exists(path)) {
@@ -495,7 +525,7 @@ public class IRPlatformService {
         }
         try (Directory dir = FSDirectory.open(path); DirectoryReader reader = DirectoryReader.open(dir)) {
             IndexSearcher searcher = new IndexSearcher(reader);
-            setSimilarity(searcher, model);
+            setSimilarity(searcher, model, lengthNormalization);
             QueryParser parser = new QueryParser("content", analyzerFactory.getAnalyzer(tokenizer, stemming));
             Query q = parser.parse(QueryParser.escape(query));
             TopDocs topDocs = searcher.search(q, Math.max(100, (page + 1) * size));
@@ -523,7 +553,7 @@ public class IRPlatformService {
         Map<String, Set<String>> relevance = parseCisiRelevance("src/main/resources/CISI.REL");
         List<String> tokenizers = List.of("standard", "simple");
         List<Boolean> stemOptions = List.of(Boolean.FALSE, Boolean.TRUE);
-        List<String> models = List.of("tf", "tfidf", "normalized");
+        List<String> models = List.of("bm25", "tf", "tfidf", "normalized");
         List<Map<String, Object>> results = new ArrayList<>();
 
         for (String tokenizer : tokenizers) {
@@ -641,7 +671,7 @@ public class IRPlatformService {
 
     private Map<String, String> parseCisiQueries(String path) throws IOException {
         Map<String, String> out = new HashMap<>();
-        try (BufferedReader br = Files.newBufferedReader(Paths.get(path))) {
+        try (BufferedReader br = Files.newBufferedReader(Paths.get(path), java.nio.charset.StandardCharsets.UTF_8)) {
             String line;
             String currentId = null;
             boolean inW = false;
@@ -676,7 +706,7 @@ public class IRPlatformService {
 
     private Map<String, Set<String>> parseCisiRelevance(String path) throws IOException {
         Map<String, Set<String>> out = new HashMap<>();
-        try (BufferedReader br = Files.newBufferedReader(Paths.get(path))) {
+        try (BufferedReader br = Files.newBufferedReader(Paths.get(path), java.nio.charset.StandardCharsets.UTF_8)) {
             String line;
             while ((line = br.readLine()) != null) {
                 String[] parts = line.trim().split("\\s+");
