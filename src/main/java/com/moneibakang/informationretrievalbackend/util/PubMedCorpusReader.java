@@ -167,10 +167,64 @@ public class PubMedCorpusReader {
                 doc.setTimestamp(System.currentTimeMillis());
                 out.add(doc);
             }
+            if (out.isEmpty()) {
+                // Fallback for topic-style XML files (e.g. TREC PM topics) so imports don't fail.
+                out = parseTopicStyleXml(xml, xp);
+            }
             return out;
         } catch (Exception e) {
             throw new IOException("Failed to parse PubMed XML: " + e.getMessage(), e);
         }
+    }
+
+    private List<Document> parseTopicStyleXml(org.w3c.dom.Document xml, javax.xml.xpath.XPath xp) throws Exception {
+        NodeList topics = (NodeList) xp.evaluate(
+                "//*[local-name()='topic']",
+                xml.getDocumentElement(),
+                XPathConstants.NODESET);
+        List<Document> out = new ArrayList<>();
+        for (int i = 0; i < topics.getLength(); i++) {
+            Node n = topics.item(i);
+            if (!(n instanceof Element el)) {
+                continue;
+            }
+            String number = el.getAttribute("number");
+            if (number == null || number.isBlank()) {
+                number = Integer.toString(i + 1);
+            }
+            String disease = firstTextByLocalName(el, xp, "disease");
+            String gene = firstTextByLocalName(el, xp, "gene");
+            String demographic = firstTextByLocalName(el, xp, "demographic");
+
+            String title = nonBlank(disease, "Topic " + number);
+            StringBuilder content = new StringBuilder();
+            if (!disease.isBlank()) {
+                content.append("Disease: ").append(disease);
+            }
+            if (!gene.isBlank()) {
+                if (content.length() > 0) {
+                    content.append('\n');
+                }
+                content.append("Gene: ").append(gene);
+            }
+            if (!demographic.isBlank()) {
+                if (content.length() > 0) {
+                    content.append('\n');
+                }
+                content.append("Demographic: ").append(demographic);
+            }
+
+            Document doc = new Document();
+            doc.setId("PUBMED-TOPIC-" + number);
+            doc.setTitle(title);
+            doc.setAuthor("");
+            doc.setContent(nonBlank(content.toString(), "(no content)"));
+            doc.setDataset("PUBMED");
+            doc.setCollection("PUBMED");
+            doc.setTimestamp(System.currentTimeMillis());
+            out.add(doc);
+        }
+        return out;
     }
 
     private static String firstTextByLocalName(Element context, javax.xml.xpath.XPath xp, String localName)

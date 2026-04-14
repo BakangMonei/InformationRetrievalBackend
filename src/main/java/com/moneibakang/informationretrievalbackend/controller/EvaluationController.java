@@ -1,6 +1,7 @@
 package com.moneibakang.informationretrievalbackend.controller;
 
 import com.moneibakang.informationretrievalbackend.api.ApiResponse;
+import com.moneibakang.informationretrievalbackend.dto.EvaluationRunRequest;
 import com.moneibakang.informationretrievalbackend.model.EvaluationMetrics;
 import com.moneibakang.informationretrievalbackend.service.EvaluationService;
 import com.moneibakang.informationretrievalbackend.service.IRPlatformService;
@@ -9,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/evaluation")
+@RequestMapping({"/api/evaluation", "/api/api/evaluation"})
 @CrossOrigin(origins = "*")
 public class EvaluationController {
 
@@ -28,6 +30,18 @@ public class EvaluationController {
     public EvaluationController(EvaluationService evaluationService, IRPlatformService irPlatformService) {
         this.evaluationService = evaluationService;
         this.irPlatformService = irPlatformService;
+    }
+
+    /**
+     * Runs IR evaluation and stores the latest metrics/PR curve in memory.
+     * Compatible alias for clients using the /api/evaluation namespace.
+     */
+    @PostMapping("/run")
+    public ResponseEntity<ApiResponse<EvaluationMetrics>> run(@RequestBody EvaluationRunRequest request) {
+        EvaluationMetrics metrics = irPlatformService.runEvaluation(
+                request.getRetrievedDocIds(),
+                request.getRelevantDocIds());
+        return ResponseEntity.ok(ApiResponse.ok(metrics, "Evaluation completed", HttpStatus.OK.value()));
     }
 
     /**
@@ -47,6 +61,7 @@ public class EvaluationController {
     }
 
     @PostMapping("/search")
+    @GetMapping("/search")
     public ResponseEntity<?> evaluateSearch(
             @RequestParam String query,
             @RequestParam(defaultValue = "tf-idf") String rankingAlgorithm,
@@ -63,6 +78,7 @@ public class EvaluationController {
     }
 
     @PostMapping("/compare/tokenizers")
+    @GetMapping("/compare/tokenizers")
     public ResponseEntity<?> compareTokenizers(@RequestParam String query) {
         try {
             Map<String, Object> comparison = evaluationService.compareTokenizers(query);
@@ -76,6 +92,7 @@ public class EvaluationController {
     }
 
     @PostMapping("/compare/stemming")
+    @GetMapping("/compare/stemming")
     public ResponseEntity<?> compareStemming(@RequestParam String query) {
         try {
             Map<String, Object> comparison = evaluationService.compareStemming(query);
@@ -89,6 +106,7 @@ public class EvaluationController {
     }
 
     @PostMapping("/compare/ranking")
+    @GetMapping("/compare/ranking")
     public ResponseEntity<?> compareRankingAlgorithms(@RequestParam String query) {
         try {
             Map<String, Object> comparison = evaluationService.compareRankingAlgorithms(query);
