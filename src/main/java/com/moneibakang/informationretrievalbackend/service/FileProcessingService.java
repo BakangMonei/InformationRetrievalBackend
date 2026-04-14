@@ -57,6 +57,45 @@ public class FileProcessingService {
         return queries;
     }
 
+    /**
+     * Parses CISI-style query files and preserves their query ids.
+     * If ids are missing/unparseable, it falls back to 1..N ordering.
+     */
+    public java.util.Map<String, String> processQueryFileWithIds(MultipartFile file) throws IOException {
+        java.util.Map<String, String> out = new java.util.LinkedHashMap<>();
+        String content = new String(file.getBytes(), StandardCharsets.UTF_8);
+        String[] querySections = content.split("\\.I ");
+        int fallbackId = 1;
+        for (String section : querySections) {
+            String s = section.trim();
+            if (s.isEmpty()) {
+                continue;
+            }
+            String id = null;
+            int firstLineEnd = s.indexOf('\n');
+            String firstLine = firstLineEnd >= 0 ? s.substring(0, firstLineEnd).trim() : s;
+            if (!firstLine.isBlank()) {
+                String digits = firstLine.replaceAll("[^0-9]", "").trim();
+                if (!digits.isBlank()) {
+                    id = digits;
+                }
+            }
+            if (id == null) {
+                id = String.valueOf(fallbackId++);
+            }
+
+            Pattern queryPattern = Pattern.compile("\\.W\\s*(.*?)(?=\\.I|$)", Pattern.DOTALL);
+            Matcher queryMatcher = queryPattern.matcher(section);
+            if (queryMatcher.find()) {
+                String text = queryMatcher.group(1).trim();
+                if (!text.isBlank()) {
+                    out.put(id, text);
+                }
+            }
+        }
+        return out;
+    }
+
     public List<RelevanceJudgment> processRelevanceFile(MultipartFile file) throws IOException {
         List<RelevanceJudgment> judgments = new ArrayList<>();
         try (Reader reader = new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8)) {

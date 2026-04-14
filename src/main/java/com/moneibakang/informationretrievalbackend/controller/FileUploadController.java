@@ -1,6 +1,7 @@
 package com.moneibakang.informationretrievalbackend.controller;
 
 import com.moneibakang.informationretrievalbackend.model.Document;
+import com.moneibakang.informationretrievalbackend.service.EvaluationDataStore;
 import com.moneibakang.informationretrievalbackend.service.FileProcessingService;
 import com.moneibakang.informationretrievalbackend.service.DocumentService;
 import com.moneibakang.informationretrievalbackend.dto.DocumentDTO;
@@ -23,6 +24,9 @@ public class FileUploadController {
 
     @Autowired
     private DocumentService documentService;
+
+    @Autowired
+    private EvaluationDataStore evaluationDataStore;
 
     @PostMapping("/cisi")
     public ResponseEntity<?> uploadCisiFile(@RequestParam("file") MultipartFile file) {
@@ -67,13 +71,17 @@ public class FileUploadController {
     }
 
     @PostMapping("/queries")
-    public ResponseEntity<?> uploadQueryFile(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> uploadQueryFile(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "dataset", required = false, defaultValue = "CISI") String dataset) {
         try {
             List<String> queries = fileProcessingService.processQueryFile(file);
+            evaluationDataStore.putQueries(dataset, fileProcessingService.processQueryFileWithIds(file));
             return ResponseEntity.ok(Map.of(
                 "message", "Successfully processed query file",
                 "queryCount", queries.size(),
-                "queries", queries
+                "queries", queries,
+                "dataset", dataset
             ));
         } catch (IOException e) {
             return ResponseEntity.badRequest().body(Map.of(
@@ -84,14 +92,18 @@ public class FileUploadController {
     }
 
     @PostMapping("/relevance")
-    public ResponseEntity<?> uploadRelevanceFile(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> uploadRelevanceFile(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "dataset", required = false, defaultValue = "CISI") String dataset) {
         try {
             List<FileProcessingService.RelevanceJudgment> judgments = 
                 fileProcessingService.processRelevanceFile(file);
+            evaluationDataStore.putRelevance(dataset, judgments);
             return ResponseEntity.ok(Map.of(
                 "message", "Successfully processed relevance file",
                 "judgmentCount", judgments.size(),
-                "judgments", judgments
+                "judgments", judgments,
+                "dataset", dataset
             ));
         } catch (IOException e) {
             return ResponseEntity.badRequest().body(Map.of(

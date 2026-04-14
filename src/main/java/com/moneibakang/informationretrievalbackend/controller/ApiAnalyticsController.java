@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
@@ -33,8 +34,10 @@ public class ApiAnalyticsController {
     }
 
     @GetMapping("/zipf")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> zipf() throws IOException {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> zipf(
+            @RequestParam(defaultValue = "50") int topN,
+            @RequestParam(defaultValue = "1") int minFrequency) throws IOException {
         return ResponseEntity.ok(ApiResponse.ok(
-                irPlatformService.termDistributionStats(), "Zipf analysis", HttpStatus.OK.value()));
+                irPlatformService.zipfStats(topN, minFrequency), "Zipf analysis", HttpStatus.OK.value()));
     }
 }

@@ -142,9 +142,11 @@ public class IRPlatformController {
     }
 
     @GetMapping("/analytics/zipf")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> zipf() throws IOException {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> zipf(
+            @RequestParam(defaultValue = "50") int topN,
+            @RequestParam(defaultValue = "1") int minFrequency) throws IOException {
         log.info("GET /analytics/zipf called");
-        return ResponseEntity.ok(ApiResponse.ok(service.termDistributionStats(), "Zipf analysis", HttpStatus.OK.value()));
+        return ResponseEntity.ok(ApiResponse.ok(service.zipfStats(topN, minFrequency), "Zipf analysis", HttpStatus.OK.value()));
     }
 
     @PostMapping("/queries")
@@ -253,19 +255,19 @@ public class IRPlatformController {
         return ResponseEntity.ok(ApiResponse.ok(service.runDatasetEvaluation(dataset, queryFilePath, relevanceFilePath), "Dataset evaluation complete", HttpStatus.OK.value()));
     }
 
-    @PostMapping("/workflow/upload")
+    @PostMapping({"/workflow/upload", "/api/workflow/upload"})
     public ResponseEntity<ApiResponse<Map<String, Object>>> uploadForWorkflow(@RequestParam("file") MultipartFile file,
                                                                                @RequestParam(required = false) String dataset) throws IOException {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(service.markUpload(file, dataset), "Upload completed", HttpStatus.CREATED.value()));
     }
 
-    @GetMapping("/workflow/status")
+    @GetMapping({"/workflow/status", "/api/workflow/status"})
     public ResponseEntity<ApiResponse<Map<String, Object>>> workflowStatus() {
         return ResponseEntity.ok(ApiResponse.ok(service.workflowStatus(), "Workflow status", HttpStatus.OK.value()));
     }
 
-    @PostMapping("/workflow/reset")
+    @PostMapping({"/workflow/reset", "/api/workflow/reset"})
     public ResponseEntity<ApiResponse<Map<String, Object>>> workflowReset() {
         return ResponseEntity.ok(ApiResponse.ok(service.resetWorkflow(), "Workflow reset", HttpStatus.OK.value()));
     }

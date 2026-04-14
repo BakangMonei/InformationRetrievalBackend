@@ -33,7 +33,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -55,6 +54,7 @@ public class IRPlatformService {
     private static final Logger log = LoggerFactory.getLogger(IRPlatformService.class);
     private final LuceneDocumentRepository repository;
     private final AnalyzerFactory analyzerFactory;
+    private final EvaluationDataStore evaluationDataStore;
 
     private volatile long lastIndexingTimeMs = 0;
     private volatile long lastIndexedTokens = 0;
@@ -66,9 +66,10 @@ public class IRPlatformService {
     private final Map<String, Path> variantIndexPaths = new ConcurrentHashMap<>();
     private final Map<String, Object> workflowState = new ConcurrentHashMap<>();
 
-    public IRPlatformService(LuceneDocumentRepository repository, AnalyzerFactory analyzerFactory) {
+    public IRPlatformService(LuceneDocumentRepository repository, AnalyzerFactory analyzerFactory, EvaluationDataStore evaluationDataStore) {
         this.repository = repository;
         this.analyzerFactory = analyzerFactory;
+        this.evaluationDataStore = evaluationDataStore;
         resetWorkflow();
     }
 
@@ -357,6 +358,39 @@ public class IRPlatformService {
         return out;
     }
 
+    public Map<String, Object> zipfStats(int topN, int minFrequency) throws IOException {
+        List<Document> all = repository.findAll();
+        Map<String, Integer> freq = new HashMap<>();
+        for (Document d : all) {
+            for (String t : tokenize(d.getContent(), false)) {
+                freq.merge(t, 1, Integer::sum);
+            }
+        }
+        List<Map.Entry<String, Integer>> ranked = freq.entrySet().stream()
+                .filter(e -> e.getValue() >= Math.max(1, minFrequency))
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(Math.max(1, topN))
+                .toList();
+        List<Map<String, Object>> points = new ArrayList<>();
+        for (int i = 0; i < ranked.size(); i++) {
+            Map.Entry<String, Integer> e = ranked.get(i);
+            points.add(Map.of(
+                    "rank", i + 1,
+                    "term", e.getKey(),
+                    "frequency", e.getValue(),
+                    "logRank", Math.log(i + 1),
+                    "logFrequency", Math.log(Math.max(1, e.getValue()))
+            ));
+        }
+        return Map.of(
+                "vocabularySize", freq.size(),
+                "topN", topN,
+                "minFrequency", minFrequency,
+                "points", points,
+                "zipfSlopeApprox", zipfSlope(ranked)
+        );
+    }
+
     private Query buildQuery(String text, String category, Integer year, String keywords, String operator, String tokenizer, boolean stemming) throws Exception {
         BooleanQuery.Builder builder = new BooleanQuery.Builder();
         Analyzer analyzer = analyzerFactory.getAnalyzer(tokenizer, stemming);
@@ -597,11 +631,24 @@ public class IRPlatformService {
     }
 
     public Map<String, Object> runDatasetEvaluation(String dataset, String queryFilePath, String relevanceFilePath) throws IOException {
-        if (!"CISI".equalsIgnoreCase(dataset) && (queryFilePath == null || relevanceFilePath == null)) {
-            return Map.of("dataset", dataset, "message", "No default ground-truth available for this dataset. Provide queryFilePath and relevanceFilePath.");
+        Map<String, String> queries;
+        Map<String, Set<String>> relevance;
+        if ("CISI".equalsIgnoreCase(dataset)) {
+            queries = parseCisiQueries(queryFilePath == null ? "src/main/resources/CISI.QRY" : queryFilePath);
+            relevance = parseCisiRelevance(relevanceFilePath == null ? "src/main/resources/CISI.REL" : relevanceFilePath);
+        } else if (queryFilePath != null && relevanceFilePath != null) {
+            queries = parseCisiQueries(queryFilePath);
+            relevance = parseCisiRelevance(relevanceFilePath);
+        } else {
+            queries = evaluationDataStore.getQueries(dataset);
+            relevance = evaluationDataStore.getRelevance(dataset);
+            if (queries.isEmpty() || relevance.isEmpty()) {
+                return Map.of(
+                        "dataset", dataset,
+                        "message", "No default ground-truth available for this dataset. Upload queries/qrels via /api/upload/queries and /api/upload/relevance (dataset=...), or provide queryFilePath and relevanceFilePath."
+                );
+            }
         }
-        Map<String, String> queries = parseCisiQueries(queryFilePath == null ? "src/main/resources/CISI.QRY" : queryFilePath);
-        Map<String, Set<String>> relevance = parseCisiRelevance(relevanceFilePath == null ? "src/main/resources/CISI.REL" : relevanceFilePath);
         double p = 0;
         double r = 0;
         double f1 = 0;
